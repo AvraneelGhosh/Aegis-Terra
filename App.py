@@ -60,8 +60,9 @@ mainTab, mapTab, auditTab, registerTab = st.tabs([
 with mainTab:
     st.sidebar.header("📍 Select Active Farmer Policy")
     
-    # Live Sync Button to re-render laptop view when phone submits data
+    # Force clearing cache resources to pull latest cross-device modifications
     if st.sidebar.button("🔄 Sync Live Database", use_container_width=True):
+        st.cache_resource.clear()
         st.rerun()
 
     # Dynamic lookup directly from shared cache
