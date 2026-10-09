@@ -9,44 +9,43 @@ from RiskEngine import calculateRiskIndex, generateAiPrecautions, trainPredictiv
 from FailSafes import SecurityEngine
 
 # Page Configuration
-st.set_page_config(page_title="Parametric Agri Shield Command Center", layout="wide")
+st.set_page_config(page_title="Aegis Terra - Insurer Command Center", layout="wide", page_icon="🛡️")
 
-st.title("🌾 Parametric Insurance & Early Warning Command Center")
+st.title("🛡️ Aegis Terra: Parametric Insurance Command Center")
 st.caption("Aligned with UN SDGs: 1 (No Poverty), 2 (Zero Hunger), 13 (Climate Action)")
 
 # -------------------------------------------------------------------
-# INITIALIZE GLOBAL SESSION STATES
+# GLOBAL SHARED DATABASE (Syncs across App.py & pages/1_Farmer_Portal.py)
 # -------------------------------------------------------------------
-if 'security' not in st.session_state:
-    st.session_state.security = SecurityEngine(dailyPayoutLimit=5000)
+@st.cache_resource
+def getSharedState():
+    """Global in-memory cache shared across all pages, devices, and user sessions."""
+    return {
+        "security": SecurityEngine(dailyPayoutLimit=5000),
+        "mlModel": trainPredictiveRiskModel(),
+        "totalLiquidityPool": 25000.0,
+        "totalPayoutsExecuted": 0.0,
+        "claimLedger": pd.DataFrame([
+            {"claimId": "CLM8001", "timestamp": "2026-10-06 14:20", "farmerName": "Ramesh Kumar", "policyId": "FARM101", "amount": 250, "status": "APPROVED", "confidence": 95, "notes": "Auto-approved by risk engine"},
+            {"claimId": "CLM8002", "timestamp": "2026-10-07 09:15", "farmerName": "Sita Devi", "policyId": "FARM102", "amount": 400, "status": "APPROVED", "confidence": 92, "notes": "Auto-approved by risk engine"}
+        ]),
+        "pendingClaims": [
+            {"claimId": "CLM8003", "timestamp": "2026-10-07 11:30", "farmerName": "Rajesh Patel", "policyId": "FARM103", "amount": 300, "confidence": 78, "reason": "Conflict: Rainfall deficit but NDVI greenness remains high"}
+        ],
+        "farmerDatabase": pd.DataFrame([
+            {"farmerId": "FARM101", "name": "Ramesh Kumar", "phone": "+919876543210", "lat": 12.92, "lon": 79.13, "crop": "Rice / Paddy", "acres": 2.5, "policyValue": 250},
+            {"farmerId": "FARM102", "name": "Sita Devi", "phone": "+919876543211", "lat": 13.08, "lon": 80.27, "crop": "Wheat", "acres": 4.0, "policyValue": 400},
+            {"farmerId": "FARM103", "name": "Rajesh Patel", "phone": "+919876543212", "lat": 12.23, "lon": 79.07, "crop": "Cotton", "acres": 3.0, "policyValue": 300},
+            {"farmerId": "FARM104", "name": "Ananya Reddy", "phone": "+919876543213", "lat": 13.62, "lon": 79.41, "crop": "Maize", "acres": 5.0, "policyValue": 500}
+        ])
+    }
 
-if 'mlModel' not in st.session_state:
-    st.session_state.mlModel = trainPredictiveRiskModel()
+# Bind local references to shared global state
+state = getSharedState()
 
-if 'totalLiquidityPool' not in st.session_state:
-    st.session_state.totalLiquidityPool = 25000.0
-
-if 'totalPayoutsExecuted' not in st.session_state:
-    st.session_state.totalPayoutsExecuted = 0.0
-
-if 'claimLedger' not in st.session_state:
-    st.session_state.claimLedger = pd.DataFrame([
-        {"claimId": "CLM8001", "timestamp": "2026-10-06 14:20", "farmerName": "Ramesh Kumar", "policyId": "FARM101", "amount": 250, "status": "APPROVED", "confidence": 95, "notes": "Auto-approved by risk engine"},
-        {"claimId": "CLM8002", "timestamp": "2026-10-07 09:15", "farmerName": "Sita Devi", "policyId": "FARM102", "amount": 400, "status": "APPROVED", "confidence": 92, "notes": "Auto-approved by risk engine"}
-    ])
-
-if 'pendingClaims' not in st.session_state:
-    st.session_state.pendingClaims = [
-        {"claimId": "CLM8003", "timestamp": "2026-10-07 11:30", "farmerName": "Rajesh Patel", "policyId": "FARM103", "amount": 300, "confidence": 78, "reason": "Conflict: Rainfall deficit but NDVI greenness remains high"}
-    ]
-
-if 'farmerDatabase' not in st.session_state:
-    st.session_state.farmerDatabase = pd.DataFrame([
-        {"farmerId": "FARM101", "name": "Ramesh Kumar", "phone": "+919876543210", "lat": 12.92, "lon": 79.13, "crop": "Rice / Paddy", "acres": 2.5, "policyValue": 250},
-        {"farmerId": "FARM102", "name": "Sita Devi", "phone": "+919876543211", "lat": 13.08, "lon": 80.27, "crop": "Wheat", "acres": 4.0, "policyValue": 400},
-        {"farmerId": "FARM103", "name": "Rajesh Patel", "phone": "+919876543212", "lat": 12.23, "lon": 79.07, "crop": "Cotton", "acres": 3.0, "policyValue": 300},
-        {"farmerId": "FARM104", "name": "Ananya Reddy", "phone": "+919876543213", "lat": 13.62, "lon": 79.41, "crop": "Maize", "acres": 5.0, "policyValue": 500}
-    ])
+st.session_state.security = state["security"]
+st.session_state.mlModel = state["mlModel"]
+st.session_state.farmerDatabase = state["farmerDatabase"]
 
 # Navigation Tabs
 mainTab, mapTab, auditTab, registerTab, simulateTab = st.tabs([
@@ -54,7 +53,7 @@ mainTab, mapTab, auditTab, registerTab, simulateTab = st.tabs([
     "🗺️ Interactive GIS Regional Heatmap",
     "⚖️ Auditor Claim Confirmations",
     "📝 Farmer Self Registration Portal", 
-    "📱 Farmer WhatsApp / SMS Interface"
+    "📱 Farmer SMS / WhatsApp Interface"
 ])
 
 # -------------------------------------------------------------------
@@ -63,11 +62,11 @@ mainTab, mapTab, auditTab, registerTab, simulateTab = st.tabs([
 with mainTab:
     st.sidebar.header("📍 Select Active Farmer Policy")
     
-    farmerList = st.session_state.farmerDatabase["name"].tolist()
+    farmerList = state["farmerDatabase"]["name"].tolist()
     selectedFarmerName = st.sidebar.selectbox("Select Registered Farmer", farmerList)
     
-    farmerDetails = st.session_state.farmerDatabase[
-        st.session_state.farmerDatabase["name"] == selectedFarmerName
+    farmerDetails = state["farmerDatabase"][
+        state["farmerDatabase"]["name"] == selectedFarmerName
     ].iloc[0]
     
     lat = farmerDetails["lat"]
@@ -83,16 +82,16 @@ with mainTab:
     df = generateTelemetryData(weatherDf)
     risk = calculateRiskIndex(df)
     advisory = generateAiPrecautions(risk)
-    mlRiskScore = predictLocationRisk(st.session_state.mlModel, risk)
+    mlRiskScore = predictLocationRisk(state["mlModel"], risk)
 
     st.subheader("💰 Live Insurance Fund Capital & Risk Metrics")
-    remainingPool = st.session_state.totalLiquidityPool - st.session_state.totalPayoutsExecuted
+    remainingPool = state["totalLiquidityPool"] - state["totalPayoutsExecuted"]
     
     finCol1, finCol2, finCol3, finCol4 = st.columns(4)
-    finCol1.metric("Total Liquidity Capital", f"${st.session_state.totalLiquidityPool:,.2f}")
-    finCol2.metric("Executed Payouts Total", f"${st.session_state.totalPayoutsExecuted:,.2f}", delta="- Disbursed", delta_color="inverse")
+    finCol1.metric("Total Liquidity Capital", f"${state['totalLiquidityPool']:,.2f}")
+    finCol2.metric("Executed Payouts Total", f"${state['totalPayoutsExecuted']:,.2f}", delta="- Disbursed", delta_color="inverse")
     finCol3.metric("Available Capital Reserve", f"${remainingPool:,.2f}", delta="Solvent")
-    finCol4.metric("Daily Cap Usage", f"${st.session_state.security.currentDailyPayouts} / $5,000")
+    finCol4.metric("Daily Cap Usage", f"${state['security'].currentDailyPayouts} / $5,000")
 
     st.markdown("---")
 
@@ -114,7 +113,7 @@ with mainTab:
         
     with c2:
         st.subheader("🔒 Security & Circuit Breaker Status")
-        confidence, claimStatus, flags = st.session_state.security.validateClaim(df, risk)
+        confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
         
         st.write(f"**Validation Confidence Score:** `{confidence}%`")
         st.write(f"**Claim Evaluation Status:** `{claimStatus}`")
@@ -128,7 +127,7 @@ with mainTab:
 
         st.markdown("---")
         
-        if st.session_state.security.circuitBreakerTripped:
+        if state["security"].circuitBreakerTripped:
             st.error("🚨 CIRCUIT BREAKER TRIPPED: System Frozen")
         else:
             st.success("🟢 Circuit Breaker Armed & Ready")
@@ -150,7 +149,7 @@ with mapTab:
         st.info("💡 **Map Controls:**\n\nToggle layers to inspect regional drought hotspots. Hover over pins for real-time farm telemetry.")
 
     mapDataList = []
-    for idx, row in st.session_state.farmerDatabase.iterrows():
+    for idx, row in state["farmerDatabase"].iterrows():
         fWeather = fetchWeatherData(row["lat"], row["lon"])
         fTelemetry = generateTelemetryData(fWeather)
         fRisk = calculateRiskIndex(fTelemetry)
@@ -179,7 +178,6 @@ with mapTab:
             "Satellite NDVI Index": "Greens"
         }
         
-        # Backward and forward compatibility for Plotly v5 and v6+
         densityMapFunc = getattr(px, "density_map", getattr(px, "density_mapbox", None))
         scatterMapFunc = getattr(px, "scatter_map", getattr(px, "scatter_mapbox", None))
         
@@ -210,9 +208,7 @@ with mapTab:
         for trace in figScatter.data:
             figMap.add_trace(trace)
 
-        # Update map layout tiles for Plotly 6+ / 5+ compatibility
         figMap.update_layout(map_style="open-street-map")
-
         st.plotly_chart(figMap, use_container_width=True)
 
 # -------------------------------------------------------------------
@@ -224,10 +220,10 @@ with auditTab:
     
     st.markdown("### ⏳ Pending Claim Approval Queue")
     
-    if len(st.session_state.pendingClaims) == 0:
+    if len(state["pendingClaims"]) == 0:
         st.success("🎉 No pending claims requiring auditor manual verification.")
     else:
-        for idx, pClaim in enumerate(st.session_state.pendingClaims):
+        for idx, pClaim in enumerate(state["pendingClaims"]):
             with st.expander(f"📌 Claim `{pClaim['claimId']}` - {pClaim['farmerName']} (${pClaim['amount']})", expanded=True):
                 auditCol1, auditCol2, auditCol3 = st.columns([2, 2, 1])
                 
@@ -243,8 +239,8 @@ with auditTab:
                 with auditCol3:
                     st.write("**Auditor Action:**")
                     if st.button("✅ Approve Payout", key=f"approve_{idx}"):
-                        st.session_state.totalPayoutsExecuted += pClaim['amount']
-                        st.session_state.security.currentDailyPayouts += pClaim['amount']
+                        state["totalPayoutsExecuted"] += pClaim['amount']
+                        state["security"].currentDailyPayouts += pClaim['amount']
                         
                         newRecord = {
                             "claimId": pClaim['claimId'],
@@ -256,8 +252,8 @@ with auditTab:
                             "confidence": pClaim['confidence'],
                             "notes": "Approved by Human Auditor"
                         }
-                        st.session_state.claimLedger = pd.concat([st.session_state.claimLedger, pd.DataFrame([newRecord])], ignore_index=True)
-                        st.session_state.pendingClaims.pop(idx)
+                        state["claimLedger"] = pd.concat([state["claimLedger"], pd.DataFrame([newRecord])], ignore_index=True)
+                        state["pendingClaims"].pop(idx)
                         st.rerun()
                         
                     if st.button("❌ Reject Claim", key=f"reject_{idx}"):
@@ -271,13 +267,13 @@ with auditTab:
                             "confidence": pClaim['confidence'],
                             "notes": "Rejected by Human Auditor"
                         }
-                        st.session_state.claimLedger = pd.concat([st.session_state.claimLedger, pd.DataFrame([newRecord])], ignore_index=True)
-                        st.session_state.pendingClaims.pop(idx)
+                        state["claimLedger"] = pd.concat([state["claimLedger"], pd.DataFrame([newRecord])], ignore_index=True)
+                        state["pendingClaims"].pop(idx)
                         st.rerun()
 
     st.markdown("---")
     st.markdown("### 📜 Executed Payout & Audit History Ledger")
-    st.dataframe(st.session_state.claimLedger, use_container_width=True)
+    st.dataframe(state["claimLedger"], use_container_width=True)
 
 # -------------------------------------------------------------------
 # TAB 4: FARMER SELF REGISTRATION PORTAL
@@ -303,7 +299,7 @@ with registerTab:
         
         if submitRegistration:
             if newFarmerName and newFarmerPhone:
-                newFarmerId = f"FARM{101 + len(st.session_state.farmerDatabase)}"
+                newFarmerId = f"FARM{101 + len(state['farmerDatabase'])}"
                 calculatedPolicyValue = int(newAcres * 100)
                 
                 newFarmerRecord = {
@@ -317,22 +313,23 @@ with registerTab:
                     "policyValue": calculatedPolicyValue
                 }
                 
-                st.session_state.farmerDatabase = pd.concat([
-                    st.session_state.farmerDatabase, 
+                state["farmerDatabase"] = pd.concat([
+                    state["farmerDatabase"], 
                     pd.DataFrame([newFarmerRecord])
                 ], ignore_index=True)
                 
                 st.success(f"🎉 Success! {newFarmerName} registered with Policy ID `{newFarmerId}`. Coverage: `${calculatedPolicyValue}`.")
-                st.info("The new farm location is now live on the GIS Regional Heatmap and active in the telemetry engine.")
+                st.info("The new farm location is now live on the GIS Regional Heatmap and active across all mobile portals.")
+                st.rerun()
             else:
                 st.error("Please fill in both the Full Name and Mobile Number fields.")
 
     st.markdown("---")
     st.subheader("📋 Active Registered Farmers Database")
-    st.dataframe(st.session_state.farmerDatabase, use_container_width=True)
+    st.dataframe(state["farmerDatabase"], use_container_width=True)
 
 # -------------------------------------------------------------------
-# TAB 5: FARMER WHATSAPP / SMS INTERFACE
+# TAB 5: FARMER SMS / WHATSAPP INTERFACE SIMULATOR
 # -------------------------------------------------------------------
 with simulateTab:
     st.subheader("📲 Low-Tech Farmer Interaction Simulator")
@@ -346,7 +343,7 @@ with simulateTab:
     with chatCol1:
         st.markdown("#### Simulated Incoming SMS / WhatsApp Alert")
         st.code(f"""
-        [ALERT - AGRI SHIELD]
+        [ALERT - AEGIS TERRA]
         Hello {farmerDetails['name']},
         Drought risk score for your {crop} farm reached {risk['compositeRisk']}.
         
@@ -363,14 +360,14 @@ with simulateTab:
         
         if st.button("Submit Reply"):
             if farmerReply == "YES":
-                confidence, claimStatus, flags = st.session_state.security.validateClaim(df, risk)
+                confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
                 
                 if confidence >= 90:
-                    success, msg = st.session_state.security.processPayout(policyValue)
+                    success, msg = state["security"].processPayout(policyValue)
                     if success:
-                        st.session_state.totalPayoutsExecuted += policyValue
+                        state["totalPayoutsExecuted"] += policyValue
                         newClaim = {
-                            "claimId": f"CLM{8001 + len(st.session_state.claimLedger)}",
+                            "claimId": f"CLM{8001 + len(state['claimLedger'])}",
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "farmerName": farmerDetails['name'],
                             "policyId": farmerDetails['farmerId'],
@@ -379,13 +376,14 @@ with simulateTab:
                             "confidence": confidence,
                             "notes": "Triggered via SMS Opt-In"
                         }
-                        st.session_state.claimLedger = pd.concat([st.session_state.claimLedger, pd.DataFrame([newClaim])], ignore_index=True)
+                        state["claimLedger"] = pd.concat([state["claimLedger"], pd.DataFrame([newClaim])], ignore_index=True)
                         st.success(f"Response Processed: {msg}")
+                        st.rerun()
                     else:
                         st.error(f"Payout Blocked by Security Engine: {msg}")
                 else:
                     newPending = {
-                        "claimId": f"CLM{8001 + len(st.session_state.claimLedger) + len(st.session_state.pendingClaims)}",
+                        "claimId": f"CLM{8001 + len(state['claimLedger']) + len(state['pendingClaims'])}",
                         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                         "farmerName": farmerDetails['name'],
                         "policyId": farmerDetails['farmerId'],
@@ -393,8 +391,9 @@ with simulateTab:
                         "confidence": confidence,
                         "reason": ", ".join(flags) if flags else "Low confidence score evaluation"
                     }
-                    st.session_state.pendingClaims.append(newPending)
+                    state["pendingClaims"].append(newPending)
                     st.warning(f"Claim flagged due to medium confidence ({confidence}%). Routed to Auditor Confirmation Tab for review.")
+                    st.rerun()
                     
             elif farmerReply == "NO":
                 st.info("Farmer chose to preserve policy reserves. Policy remains active.")

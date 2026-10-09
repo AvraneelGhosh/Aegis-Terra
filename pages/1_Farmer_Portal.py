@@ -10,34 +10,21 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from DataPipeline import fetchWeatherData, generateTelemetryData
 from RiskEngine import calculateRiskIndex, generateAiPrecautions
-from FailSafes import SecurityEngine
+from App import getSharedState
 
 # Page Config styled for Mobile / Low-Tech simulation
 st.set_page_config(page_title="Aegis Terra - Farmer Portal", page_icon="🌾", layout="centered")
 
-# Initialize Shared Session States if accessed standalone
-if 'farmerDatabase' not in st.session_state:
-    st.session_state.farmerDatabase = pd.DataFrame([
-        {"farmerId": "FARM101", "name": "Ramesh Kumar", "phone": "+919876543210", "lat": 12.92, "lon": 79.13, "crop": "Rice / Paddy", "acres": 2.5, "policyValue": 250},
-        {"farmerId": "FARM102", "name": "Sita Devi", "phone": "+919876543211", "lat": 13.08, "lon": 80.27, "crop": "Wheat", "acres": 4.0, "policyValue": 400},
-        {"farmerId": "FARM103", "name": "Rajesh Patel", "phone": "+919876543212", "lat": 12.23, "lon": 79.07, "crop": "Cotton", "acres": 3.0, "policyValue": 300}
-    ])
+# Fetch Shared Global Cache across all devices
+state = getSharedState()
 
-if 'totalPayoutsExecuted' not in st.session_state:
-    st.session_state.totalPayoutsExecuted = 0.0
-
-if 'security' not in st.session_state:
-    st.session_state.security = SecurityEngine(dailyPayoutLimit=5000)
-
-if 'claimLedger' not in st.session_state:
-    st.session_state.claimLedger = pd.DataFrame()
-
+# Initialize Page-Specific Chat History (Isolated to session)
 if 'chatHistory' not in st.session_state:
     st.session_state.chatHistory = []
 
 st.markdown("<h2 style='text-align: center;'>🌾 Aegis Terra Mobile Portal</h2>", unsafe_allow_html=True)
 
-# Top Bar Mode Selector: Existing Farmer Login vs. New Registration
+# Top Bar Mode Selector
 portalMode = st.radio("Select Portal Action:", ["👤 Existing Farmer Portal", "📝 New Farmer Self-Registration"], horizontal=True)
 
 st.markdown("---")
@@ -68,7 +55,7 @@ if portalMode == "📝 New Farmer Self-Registration":
 
         if btnSubmitReg:
             if regName and regPhone:
-                newId = f"FARM{101 + len(st.session_state.farmerDatabase)}"
+                newId = f"FARM{101 + len(state['farmerDatabase'])}"
                 
                 newFarmerObj = {
                     "farmerId": newId,
@@ -81,14 +68,15 @@ if portalMode == "📝 New Farmer Self-Registration":
                     "policyValue": estimatedPolicy
                 }
 
-                # Save directly into global system memory
-                st.session_state.farmerDatabase = pd.concat([
-                    st.session_state.farmerDatabase, 
+                # Save directly into global shared memory
+                state["farmerDatabase"] = pd.concat([
+                    state["farmerDatabase"], 
                     pd.DataFrame([newFarmerObj])
                 ], ignore_index=True)
 
                 st.success(f"🎉 Welcome aboard, {regName}! Your policy `{newId}` is now active with `${estimatedPolicy}` coverage.")
-                st.toast("Registration complete! You can now switch to 'Existing Farmer Portal' tab to view alerts.")
+                st.toast("Registration complete! Switch to 'Existing Farmer Portal' to view active alerts.")
+                st.rerun()
             else:
                 st.error("Please provide both your Name and Mobile Number.")
 
@@ -96,11 +84,11 @@ if portalMode == "📝 New Farmer Self-Registration":
 # MODE 2: EXISTING FARMER PORTAL & CLAIM SYSTEM
 # -------------------------------------------------------------------
 else:
-    farmerList = st.session_state.farmerDatabase["name"].tolist()
+    farmerList = state["farmerDatabase"]["name"].tolist()
     selectedFarmer = st.selectbox("👤 Select Your Account:", farmerList)
 
-    farmerDetails = st.session_state.farmerDatabase[
-        st.session_state.farmerDatabase["name"] == selectedFarmer
+    farmerDetails = state["farmerDatabase"][
+        state["farmerDatabase"]["name"] == selectedFarmer
     ].iloc[0]
 
     farmerName = farmerDetails["name"]
@@ -140,32 +128,44 @@ else:
         if st.button("✅ Request Instant Payout", use_container_width=True):
             st.session_state.chatHistory.append({"role": "user", "content": "YES"})
             
-            confidence, claimStatus, flags = st.session_state.security.validateClaim(df, risk)
+            confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
             
             if confidence >= 90:
-                success, msg = st.session_state.security.processPayout(policyValue)
+                success, msg = state["security"].processPayout(policyValue)
                 if success:
-                    st.session_state.totalPayoutsExecuted += policyValue
+                    state["totalPayoutsExecuted"] += policyValue
                     
                     newRecord = {
-                        "claimId": f"CLM{8001 + len(st.session_state.claimLedger)}",
+                        "claimId": f"CLM{8001 + len(state['claimLedger'])}",
                         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                         "farmerName": farmerName,
                         "policyId": policyId,
                         "amount": policyValue,
                         "status": "AUTO APPROVED",
                         "confidence": confidence,
-                        "notes": "Claimed via Farmer Mobile Self-Portal"
+                        "notes": "Claimed via Mobile Portal"
                     }
-                    st.session_state.claimLedger = pd.concat([st.session_state.claimLedger, pd.DataFrame([newRecord])], ignore_index=True)
+                    state["claimLedger"] = pd.concat([state["claimLedger"], pd.DataFrame([newRecord])], ignore_index=True)
                     
                     responseMsg = f"🎉 **Payout Approved!**\n\n**${policyValue}.00** transferred via Instant Settlement. Txn ID: `TXN-{int(time.time())}`"
                     st.session_state.chatHistory.append({"role": "assistant", "content": responseMsg})
+                    st.rerun()
                 else:
                     st.session_state.chatHistory.append({"role": "assistant", "content": f"🚨 Payout Error: {msg}"})
             else:
+                newPending = {
+                    "claimId": f"CLM{8001 + len(state['claimLedger']) + len(state['pendingClaims'])}",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "farmerName": farmerName,
+                    "policyId": policyId,
+                    "amount": policyValue,
+                    "confidence": confidence,
+                    "reason": ", ".join(flags) if flags else "Low confidence score evaluation"
+                }
+                state["pendingClaims"].append(newPending)
                 responseMsg = f"⏳ **Claim Flagged for Review**\n\nReason: {', '.join(flags)}. Sent to Auditor queue."
                 st.session_state.chatHistory.append({"role": "assistant", "content": responseMsg})
+                st.rerun()
 
     with btnCol2:
         if st.button("❌ Decline & Reserve Funds", use_container_width=True):
@@ -185,14 +185,37 @@ else:
         cleanPrompt = userPrompt.strip().upper()
         
         if cleanPrompt in ["YES", "Y", "CLAIM"]:
-            confidence, claimStatus, flags = st.session_state.security.validateClaim(df, risk)
+            confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
             if confidence >= 90:
-                st.session_state.totalPayoutsExecuted += policyValue
-                st.session_state.chatHistory.append({
-                    "role": "assistant", 
-                    "content": f"🎉 **Payout Approved!** **${policyValue}.00** transferred to linked bank account."
-                })
+                success, msg = state["security"].processPayout(policyValue)
+                if success:
+                    state["totalPayoutsExecuted"] += policyValue
+                    newRecord = {
+                        "claimId": f"CLM{8001 + len(state['claimLedger'])}",
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "farmerName": farmerName,
+                        "policyId": policyId,
+                        "amount": policyValue,
+                        "status": "AUTO APPROVED",
+                        "confidence": confidence,
+                        "notes": "Claimed via Chat Assistant"
+                    }
+                    state["claimLedger"] = pd.concat([state["claimLedger"], pd.DataFrame([newRecord])], ignore_index=True)
+                    st.session_state.chatHistory.append({
+                        "role": "assistant", 
+                        "content": f"🎉 **Payout Approved!** **${policyValue}.00** transferred to linked bank account."
+                    })
             else:
+                newPending = {
+                    "claimId": f"CLM{8001 + len(state['claimLedger']) + len(state['pendingClaims'])}",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "farmerName": farmerName,
+                    "policyId": policyId,
+                    "amount": policyValue,
+                    "confidence": confidence,
+                    "reason": ", ".join(flags) if flags else "Low confidence score evaluation"
+                }
+                state["pendingClaims"].append(newPending)
                 st.session_state.chatHistory.append({
                     "role": "assistant", 
                     "content": "⏳ Claim Flagged for Auditor Review."
