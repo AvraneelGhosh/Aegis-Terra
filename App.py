@@ -15,7 +15,7 @@ st.title("🛡️ Aegis Terra: Parametric Insurance Command Center")
 st.caption("Aligned with UN SDGs: 1 (No Poverty), 2 (Zero Hunger), 13 (Climate Action)")
 
 # -------------------------------------------------------------------
-# GLOBAL SHARED DATABASE (Syncs across App.py & pages/1_Farmer_Portal.py)
+# GLOBAL SHARED DATABASE CACHE (Syncs across App.py & pages/1_Farmer_Portal.py)
 # -------------------------------------------------------------------
 @st.cache_resource
 def getSharedState():
@@ -47,12 +47,11 @@ st.session_state.security = state["security"]
 st.session_state.mlModel = state["mlModel"]
 
 # Navigation Tabs
-mainTab, mapTab, auditTab, registerTab, simulateTab = st.tabs([
+mainTab, mapTab, auditTab, registerTab = st.tabs([
     "📊 Insurer Analytics Command Center", 
     "🗺️ Interactive GIS Regional Heatmap",
     "⚖️ Auditor Claim Confirmations",
-    "📝 Farmer Self Registration Portal", 
-    "📱 Farmer SMS / WhatsApp Interface"
+    "📝 Farmer Registration Portal"
 ])
 
 # -------------------------------------------------------------------
@@ -61,11 +60,11 @@ mainTab, mapTab, auditTab, registerTab, simulateTab = st.tabs([
 with mainTab:
     st.sidebar.header("📍 Select Active Farmer Policy")
     
-    # Live Sync Trigger Button
+    # Live Sync Button to re-render laptop view when phone submits data
     if st.sidebar.button("🔄 Sync Live Database", use_container_width=True):
         st.rerun()
 
-    # Dynamic lookup directly from global state cache
+    # Dynamic lookup directly from shared cache
     currentDb = state["farmerDatabase"]
     farmerList = currentDb["name"].tolist()
     selectedFarmerName = st.sidebar.selectbox("Select Registered Farmer", farmerList)
@@ -90,11 +89,12 @@ with mainTab:
     mlRiskScore = predictLocationRisk(state["mlModel"], risk)
 
     st.subheader("💰 Live Insurance Fund Capital & Risk Metrics")
-    remainingPool = state["totalLiquidityPool"] - state["totalPayoutsExecuted"]
+    totalExecuted = state["totalPayoutsExecuted"]
+    remainingPool = state["totalLiquidityPool"] - totalExecuted
     
     finCol1, finCol2, finCol3, finCol4 = st.columns(4)
     finCol1.metric("Total Liquidity Capital", f"${state['totalLiquidityPool']:,.2f}")
-    finCol2.metric("Executed Payouts Total", f"${state['totalPayoutsExecuted']:,.2f}", delta="- Disbursed", delta_color="inverse")
+    finCol2.metric("Executed Payouts Total", f"${totalExecuted:,.2f}", delta="- Disbursed", delta_color="inverse")
     finCol3.metric("Available Capital Reserve", f"${remainingPool:,.2f}", delta="Solvent")
     finCol4.metric("Daily Cap Usage", f"${state['security'].currentDailyPayouts} / $5,000")
 
@@ -281,7 +281,7 @@ with auditTab:
     st.dataframe(state["claimLedger"], use_container_width=True)
 
 # -------------------------------------------------------------------
-# TAB 4: FARMER SELF REGISTRATION PORTAL
+# TAB 4: FARMER REGISTRATION PORTAL
 # -------------------------------------------------------------------
 with registerTab:
     st.subheader("🌾 New Farmer Registration Portal")
@@ -332,73 +332,3 @@ with registerTab:
     st.markdown("---")
     st.subheader("📋 Active Registered Farmers Database")
     st.dataframe(state["farmerDatabase"], use_container_width=True)
-
-# -------------------------------------------------------------------
-# TAB 5: FARMER SMS / WHATSAPP INTERFACE SIMULATOR
-# -------------------------------------------------------------------
-with simulateTab:
-    st.subheader("📲 Low-Tech Farmer Interaction Simulator")
-    
-    st.info(f"**Target Farmer:** {farmerDetails['name']} ({farmerDetails['phone']})\n\n"
-            f"**AI Early Warning Advisory:** [{advisory['level']}] {advisory['action']}")
-    
-    st.markdown("---")
-    chatCol1, chatCol2 = st.columns(2)
-    
-    with chatCol1:
-        st.markdown("#### Simulated Incoming SMS / WhatsApp Alert")
-        st.code(f"""
-        [ALERT - AEGIS TERRA]
-        Hello {farmerDetails['name']},
-        Drought risk score for your {crop} farm reached {risk['compositeRisk']}.
-        
-        Precaution: {advisory['action']}
-        
-        Your active policy permits an advance payout of ${policyValue}.
-        Do you require immediate financial liquidity?
-        Reply 'YES' to claim or 'NO' to save liquidity.
-        """, language="text")
-        
-    with chatCol2:
-        st.markdown("#### Farmer Reply Simulation")
-        farmerReply = st.radio("Farmer Replies via SMS/WhatsApp:", ["(Awaiting Response)", "YES", "NO"])
-        
-        if st.button("Submit Reply"):
-            if farmerReply == "YES":
-                confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
-                
-                if confidence >= 90:
-                    success, msg = state["security"].processPayout(policyValue)
-                    if success:
-                        state["totalPayoutsExecuted"] += policyValue
-                        newClaim = {
-                            "claimId": f"CLM{8001 + len(state['claimLedger'])}",
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "farmerName": farmerDetails['name'],
-                            "policyId": farmerDetails['farmerId'],
-                            "amount": policyValue,
-                            "status": "AUTO APPROVED",
-                            "confidence": confidence,
-                            "notes": "Triggered via SMS Opt-In"
-                        }
-                        state["claimLedger"] = pd.concat([state["claimLedger"], pd.DataFrame([newClaim])], ignore_index=True)
-                        st.success(f"Response Processed: {msg}")
-                        st.rerun()
-                    else:
-                        st.error(f"Payout Blocked by Security Engine: {msg}")
-                else:
-                    newPending = {
-                        "claimId": f"CLM{8001 + len(state['claimLedger']) + len(state['pendingClaims'])}",
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "farmerName": farmerDetails['name'],
-                        "policyId": farmerDetails['farmerId'],
-                        "amount": policyValue,
-                        "confidence": confidence,
-                        "reason": ", ".join(flags) if flags else "Low confidence score evaluation"
-                    }
-                    state["pendingClaims"].append(newPending)
-                    st.warning(f"Claim flagged due to medium confidence ({confidence}%). Routed to Auditor Confirmation Tab for review.")
-                    st.rerun()
-                    
-            elif farmerReply == "NO":
-                st.info("Farmer chose to preserve policy reserves. Policy remains active.")

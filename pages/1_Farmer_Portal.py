@@ -18,7 +18,7 @@ st.set_page_config(page_title="Aegis Terra - Farmer Portal", page_icon="🌾", l
 # Fetch Shared Global Cache across all devices
 state = getSharedState()
 
-# Initialize Page-Specific Chat History (Isolated to session)
+# Initialize Page-Specific Chat History (Isolated to current user session)
 if 'chatHistory' not in st.session_state:
     st.session_state.chatHistory = []
 
@@ -68,7 +68,7 @@ if portalMode == "📝 New Farmer Self-Registration":
                     "policyValue": estimatedPolicy
                 }
 
-                # Save directly into global shared memory
+                # Concatenate directly into global shared state memory
                 state["farmerDatabase"] = pd.concat([
                     state["farmerDatabase"], 
                     pd.DataFrame([newFarmerObj])
@@ -133,6 +133,7 @@ else:
             if confidence >= 90:
                 success, msg = state["security"].processPayout(policyValue)
                 if success:
+                    # Update global shared total
                     state["totalPayoutsExecuted"] += policyValue
                     
                     newRecord = {
@@ -145,6 +146,7 @@ else:
                         "confidence": confidence,
                         "notes": "Claimed via Mobile Portal"
                     }
+                    # Concatenate directly into global shared ledger
                     state["claimLedger"] = pd.concat([state["claimLedger"], pd.DataFrame([newRecord])], ignore_index=True)
                     
                     responseMsg = f"🎉 **Payout Approved!**\n\n**${policyValue}.00** transferred via Instant Settlement. Txn ID: `TXN-{int(time.time())}`"
@@ -205,6 +207,7 @@ else:
                         "role": "assistant", 
                         "content": f"🎉 **Payout Approved!** **${policyValue}.00** transferred to linked bank account."
                     })
+                    st.rerun()
             else:
                 newPending = {
                     "claimId": f"CLM{8001 + len(state['claimLedger']) + len(state['pendingClaims'])}",
@@ -220,14 +223,16 @@ else:
                     "role": "assistant", 
                     "content": "⏳ Claim Flagged for Auditor Review."
                 })
+                st.rerun()
         elif cleanPrompt in ["NO", "N", "DECLINE"]:
             st.session_state.chatHistory.append({
                 "role": "assistant", 
                 "content": "ℹ️ Policy liquidity preserved."
             })
+            st.rerun()
         else:
             st.session_state.chatHistory.append({
                 "role": "assistant", 
                 "content": f"🤖 Reply **YES** to claim **${policyValue}** or **NO** to save reserves."
             })
-        st.rerun()
+            st.rerun()
