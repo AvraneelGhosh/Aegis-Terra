@@ -40,12 +40,11 @@ def getSharedState():
         ])
     }
 
-# Bind local references to shared global state
+# Bind global state reference
 state = getSharedState()
 
 st.session_state.security = state["security"]
 st.session_state.mlModel = state["mlModel"]
-st.session_state.farmerDatabase = state["farmerDatabase"]
 
 # Navigation Tabs
 mainTab, mapTab, auditTab, registerTab, simulateTab = st.tabs([
@@ -62,11 +61,17 @@ mainTab, mapTab, auditTab, registerTab, simulateTab = st.tabs([
 with mainTab:
     st.sidebar.header("📍 Select Active Farmer Policy")
     
-    farmerList = state["farmerDatabase"]["name"].tolist()
+    # Live Sync Trigger Button
+    if st.sidebar.button("🔄 Sync Live Database", use_container_width=True):
+        st.rerun()
+
+    # Dynamic lookup directly from global state cache
+    currentDb = state["farmerDatabase"]
+    farmerList = currentDb["name"].tolist()
     selectedFarmerName = st.sidebar.selectbox("Select Registered Farmer", farmerList)
     
-    farmerDetails = state["farmerDatabase"][
-        state["farmerDatabase"]["name"] == selectedFarmerName
+    farmerDetails = currentDb[
+        currentDb["name"] == selectedFarmerName
     ].iloc[0]
     
     lat = farmerDetails["lat"]
