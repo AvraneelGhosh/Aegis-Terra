@@ -9,14 +9,13 @@ from RiskEngine import calculateRiskIndex, generateAiPrecautions, predictLocatio
 from GlobalState import getSharedState
 
 # Page Configuration
-st.set_page_config(page_title="Aegis Terra - Insurer Command Center", layout="wide", page_icon="🛡️")
+st.set_page_config(page_title="Aegis Terra - Command Center", layout="wide", page_icon="🛡️")
 
-st.title("🛡️ Aegis Terra: Parametric Insurance Command Center")
+st.title("Aegis Terra: Parametric Insurance Command Center")
 st.caption("Aligned with UN SDGs: 1 (No Poverty), 2 (Zero Hunger), 13 (Climate Action)")
 
 # Fetch Centralized State
 state = getSharedState()
-
 st.session_state.security = state["security"]
 st.session_state.mlModel = state["mlModel"]
 
@@ -32,12 +31,11 @@ mainTab, mapTab, auditTab, registerTab = st.tabs([
 # TAB 1: INSURER ANALYTICS COMMAND CENTER
 # -------------------------------------------------------------------
 with mainTab:
-    st.sidebar.header("📍 Select Active Farmer Policy")
+    st.sidebar.subheader("📍 Select Active Farmer Policy")
     
     if st.sidebar.button("🔄 Sync Live Database", use_container_width=True):
         st.rerun()
 
-    # Dynamic Company Settings Control in Sidebar
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ Company Settings")
     newPoolValue = st.sidebar.number_input(
@@ -52,7 +50,6 @@ with mainTab:
         state["totalLiquidityPool"] = newPoolValue
         st.rerun()
 
-    currentDb = pd.DataFrame(state["farmerDatabase"])
     farmerList = [f["name"] for f in state["farmerDatabase"]]
     selectedFarmerName = st.sidebar.selectbox("Select Registered Farmer", farmerList)
     
@@ -63,9 +60,10 @@ with mainTab:
     crop = farmerDetails["crop"]
     policyValue = int(farmerDetails["policyValue"])
     
-    st.sidebar.info(f"**Policy ID:** {farmerDetails['farmerId']}\n\n"
-                    f"**Phone:** {farmerDetails['phone']}\n\n"
-                    f"**Farm Area:** {farmerDetails['acres']} Acres")
+    with st.sidebar.container(border=True):
+        st.markdown(f"**Policy ID:** {farmerDetails['farmerId']}")
+        st.markdown(f"**Phone:** {farmerDetails['phone']}")
+        st.markdown(f"**Farm Area:** {farmerDetails['acres']} Acres")
 
     weatherDf = fetchWeatherData(lat, lon)
     df = generateTelemetryData(weatherDf)
@@ -99,24 +97,24 @@ with mainTab:
         st.subheader(f"Micro-Climate Telemetry ({farmerDetails['name']} - {crop})")
         fig = px.line(df, x='date', y=['tempMax', 'soilMoisturePercent', 'rainfall'], 
                       title="30-Day Environmental Metrics Trend")
+        fig.update_layout(margin=dict(l=20, r=20, t=30, b=20))
         st.plotly_chart(fig, use_container_width=True)
         
     with c2:
         st.subheader("🔒 Security & Circuit Breaker Status")
         confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
         
-        st.write(f"**Validation Confidence Score:** `{confidence}%`")
-        st.write(f"**Claim Evaluation Status:** `{claimStatus}`")
-        
-        if flags:
-            st.warning("Anomaly Flags Raised:")
-            for flag in flags:
-                st.write(f"- {flag}")
-        else:
-            st.success("No Sensor Anomaly Detected")
+        with st.container(border=True):
+            st.write(f"**Validation Confidence Score:** `{confidence}%`")
+            st.write(f"**Claim Evaluation Status:** `{claimStatus}`")
+            if flags:
+                st.write("**Anomaly Flags Raised:**")
+                for flag in flags:
+                    st.write(f"- {flag}")
+            else:
+                st.write("**Anomaly Status:** None detected")
 
-        st.markdown("---")
-        
+        st.markdown("")
         if state["security"].circuitBreakerTripped:
             st.error("🚨 CIRCUIT BREAKER TRIPPED: System Frozen")
         else:
@@ -198,7 +196,7 @@ with mapTab:
         for trace in figScatter.data:
             figMap.add_trace(trace)
 
-        figMap.update_layout(map_style="open-street-map", autosize=True)
+        figMap.update_layout(map_style="open-street-map", autosize=True, margin=dict(l=0, r=0, t=30, b=0))
         st.plotly_chart(figMap, use_container_width=True, key=f"heatmap_{len(mapDf)}")
 
 # -------------------------------------------------------------------
@@ -262,7 +260,7 @@ with auditTab:
                         st.rerun()
 
     st.markdown("---")
-    st.markdown("### 📜 Executed Payout & Audit History Ledger")
+    st.subheader("📜 Executed Payout & Audit History Ledger")
     st.dataframe(pd.DataFrame(state["claimLedger"]), use_container_width=True)
 
 # -------------------------------------------------------------------
@@ -272,44 +270,45 @@ with registerTab:
     st.subheader("🌾 New Farmer Registration Portal")
     st.caption("Self-onboarding for smallholder farmers via GPS pin or simple text inputs.")
     
-    with st.form("farmerRegistrationForm", clear_on_submit=True):
-        regCol1, regCol2 = st.columns(2)
-        
-        with regCol1:
-            newFarmerName = st.text_input("Full Name", placeholder="e.g. Rajesh Patel")
-            newFarmerPhone = st.text_input("Mobile / WhatsApp Number", placeholder="e.g. +919876543212")
-            newCrop = st.selectbox("Select Crop", ["Rice / Paddy", "Wheat", "Maize", "Cotton", "Sugarcane"])
+    with st.container(border=True):
+        with st.form("farmerRegistrationForm", clear_on_submit=True):
+            regCol1, regCol2 = st.columns(2)
             
-        with regCol2:
-            newAcres = st.number_input("Farm Size (Acres)", min_value=0.5, max_value=50.0, value=2.0, step=0.5)
-            newLat = st.number_input("Farm Latitude", value=12.92, format="%.4f")
-            newLon = st.number_input("Farm Longitude", value=79.13, format="%.4f")
+            with regCol1:
+                newFarmerName = st.text_input("Full Name", placeholder="e.g. Rajesh Patel")
+                newFarmerPhone = st.text_input("Mobile / WhatsApp Number", placeholder="e.g. +919876543212")
+                newCrop = st.selectbox("Select Crop", ["Rice / Paddy", "Wheat", "Maize", "Cotton", "Sugarcane"])
+                
+            with regCol2:
+                newAcres = st.number_input("Farm Size (Acres)", min_value=0.5, max_value=50.0, value=2.0, step=0.5)
+                newLat = st.number_input("Farm Latitude", value=12.92, format="%.4f")
+                newLon = st.number_input("Farm Longitude", value=79.13, format="%.4f")
+                
+            submitRegistration = st.form_submit_button("Register & Activate Policy")
             
-        submitRegistration = st.form_submit_button("Register & Activate Policy")
-        
-        if submitRegistration:
-            if newFarmerName and newFarmerPhone:
-                newFarmerId = f"FARM{101 + len(state['farmerDatabase'])}"
-                calculatedPolicyValue = int(newAcres * 10000) # ₹10,000 per acre coverage
-                
-                newFarmerRecord = {
-                    "farmerId": newFarmerId,
-                    "name": newFarmerName,
-                    "phone": newFarmerPhone,
-                    "lat": float(newLat),
-                    "lon": float(newLon),
-                    "crop": newCrop,
-                    "acres": float(newAcres),
-                    "policyValue": calculatedPolicyValue
-                }
-                
-                state["farmerDatabase"].append(newFarmerRecord)
-                
-                st.success(f"🎉 Success! {newFarmerName} registered with Policy ID `{newFarmerId}`. Coverage: `₹{calculatedPolicyValue:,}`.")
-                st.info("The new farm location is now live on the GIS Regional Heatmap and active across all mobile portals.")
-                st.rerun()
-            else:
-                st.error("Please fill in both the Full Name and Mobile Number fields.")
+            if submitRegistration:
+                if newFarmerName and newFarmerPhone:
+                    newFarmerId = f"FARM{101 + len(state['farmerDatabase'])}"
+                    calculatedPolicyValue = int(newAcres * 10000)
+                    
+                    newFarmerRecord = {
+                        "farmerId": newFarmerId,
+                        "name": newFarmerName,
+                        "phone": newFarmerPhone,
+                        "lat": float(newLat),
+                        "lon": float(newLon),
+                        "crop": newCrop,
+                        "acres": float(newAcres),
+                        "policyValue": calculatedPolicyValue
+                    }
+                    
+                    state["farmerDatabase"].append(newFarmerRecord)
+                    
+                    st.success(f"🎉 Success! {newFarmerName} registered with Policy ID `{newFarmerId}`. Coverage: `₹{calculatedPolicyValue:,}`.")
+                    st.info("The new farm location is now live on the GIS Regional Heatmap and active across all mobile portals.")
+                    st.rerun()
+                else:
+                    st.error("Please fill in both the Full Name and Mobile Number fields.")
 
     st.markdown("---")
     st.subheader("📋 Active Registered Farmers Database")

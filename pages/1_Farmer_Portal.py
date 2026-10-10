@@ -17,8 +17,8 @@ from RiskEngine import (
 )
 from GlobalState import getSharedState
 
-# Page Config styled for Mobile / Low-Tech simulation
-st.set_page_config(page_title="Aegis Terra - Farmer Portal", page_icon="🌾", layout="centered")
+# Page Configuration
+st.set_page_config(page_title="Aegis Terra - Farmer Portal", layout="centered", page_icon="🌾")
 
 # Fetch Centralized Shared State across pages/devices
 state = getSharedState()
@@ -27,7 +27,8 @@ state = getSharedState()
 if 'chatHistory' not in st.session_state:
     st.session_state.chatHistory = []
 
-st.markdown("<h2 style='text-align: center;'>🌾 Aegis Terra Mobile Portal</h2>", unsafe_allow_html=True)
+st.title("🌾 Aegis Terra Mobile Portal")
+st.caption("Proactive Climate Intelligence & Parametric Insurance Self-Service")
 
 # Top Bar Mode Selector
 portalMode = st.radio("Select Portal Action:", ["👤 Existing Farmer Portal", "📝 New Farmer Self-Registration"], horizontal=True)
@@ -41,46 +42,47 @@ if portalMode == "📝 New Farmer Self-Registration":
     st.subheader("📝 Register Your Farm for Insurance & Climate AI")
     st.caption("Enroll in automated parametric coverage and proactive climate advisories in under 60 seconds.")
 
-    with st.form("farmerSelfRegForm", clear_on_submit=True):
-        regName = st.text_input("Full Name", placeholder="e.g. Ananya Reddy")
-        regPhone = st.text_input("Mobile / WhatsApp Number", placeholder="+919876543210")
-        
-        colA, colB = st.columns(2)
-        with colA:
-            regCrop = st.selectbox("Crop Type", ["Rice / Paddy", "Wheat", "Maize", "Cotton", "Sugarcane"])
-            regAcres = st.number_input("Farm Size (Acres)", min_value=0.5, max_value=50.0, value=2.0, step=0.5)
-        with colB:
-            regLat = st.number_input("Farm Latitude (GPS)", value=12.9200, format="%.4f")
-            regLon = st.number_input("Farm Longitude (GPS)", value=79.1300, format="%.4f")
+    with st.container(border=True):
+        with st.form("farmerSelfRegForm", clear_on_submit=True):
+            regName = st.text_input("Full Name", placeholder="e.g. Ananya Reddy")
+            regPhone = st.text_input("Mobile / WhatsApp Number", placeholder="+919876543210")
+            
+            colA, colB = st.columns(2)
+            with colA:
+                regCrop = st.selectbox("Crop Type", ["Rice / Paddy", "Wheat", "Maize", "Cotton", "Sugarcane"])
+                regAcres = st.number_input("Farm Size (Acres)", min_value=0.5, max_value=50.0, value=2.0, step=0.5)
+            with colB:
+                regLat = st.number_input("Farm Latitude (GPS)", value=12.9200, format="%.4f")
+                regLon = st.number_input("Farm Longitude (GPS)", value=79.1300, format="%.4f")
 
-        estimatedPolicy = int(regAcres * 10000) # ₹10,000 per acre coverage
-        st.info(f"💡 **Estimated Policy Coverage:** `₹{estimatedPolicy:,}.00` (Calculated at ₹10,000/acre)")
+            estimatedPolicy = int(regAcres * 10000) # ₹10,000 per acre coverage
+            st.info(f"💡 **Estimated Policy Coverage:** `₹{estimatedPolicy:,}.00` (Calculated at ₹10,000/acre)")
 
-        btnSubmitReg = st.form_submit_button("🚀 Activate My Policy & Climate Advisor")
+            btnSubmitReg = st.form_submit_button("🚀 Activate My Policy & Climate Advisor")
 
-        if btnSubmitReg:
-            if regName and regPhone:
-                newId = f"FARM{101 + len(state['farmerDatabase'])}"
-                
-                newFarmerObj = {
-                    "farmerId": newId,
-                    "name": regName.strip(),
-                    "phone": regPhone.strip(),
-                    "lat": float(regLat),
-                    "lon": float(regLon),
-                    "crop": regCrop,
-                    "acres": float(regAcres),
-                    "policyValue": estimatedPolicy
-                }
+            if btnSubmitReg:
+                if regName and regPhone:
+                    newId = f"FARM{101 + len(state['farmerDatabase'])}"
+                    
+                    newFarmerObj = {
+                        "farmerId": newId,
+                        "name": regName.strip(),
+                        "phone": regPhone.strip(),
+                        "lat": float(regLat),
+                        "lon": float(regLon),
+                        "crop": regCrop,
+                        "acres": float(regAcres),
+                        "policyValue": estimatedPolicy
+                    }
 
-                # Mutate shared central list in-place
-                state["farmerDatabase"].append(newFarmerObj)
+                    # Mutate shared central list in-place
+                    state["farmerDatabase"].append(newFarmerObj)
 
-                st.success(f"🎉 Welcome aboard, {regName}! Policy `{newId}` is active with `₹{estimatedPolicy:,}` coverage.")
-                st.toast("Registration complete! Switch to 'Existing Farmer Portal' to view active AI advisories.")
-                st.rerun()
-            else:
-                st.error("Please provide both your Name and Mobile Number.")
+                    st.success(f"🎉 Welcome aboard, {regName}! Policy `{newId}` is active with `₹{estimatedPolicy:,}` coverage.")
+                    st.toast("Registration complete! Switch to 'Existing Farmer Portal' to view active AI advisories.")
+                    st.rerun()
+                else:
+                    st.error("Please provide both your Name and Mobile Number.")
 
 # ===================================================================
 # MODE 2: EXISTING FARMER PORTAL & AI SUSTAINABILITY ADVISOR
@@ -100,7 +102,9 @@ else:
     lat = float(farmerDetails["lat"])
     lon = float(farmerDetails["lon"])
 
-    st.info(f"**Policy ID:** `{policyId}` | **Crop:** {crop} ({acres} Acres) | **Coverage:** `₹{policyValue:,}` | **Phone:** {farmerDetails['phone']}")
+    with st.container(border=True):
+        st.markdown(f"**Policy ID:** `{policyId}` &nbsp;|&nbsp; **Crop:** {crop} ({acres} Acres)")
+        st.markdown(f"**Coverage:** `₹{policyValue:,}` &nbsp;|&nbsp; **Phone:** {farmerDetails['phone']}")
 
     # Fetch Real-Time Location Weather Telemetry & Decision Engine
     weatherDf = fetchWeatherData(lat, lon)
@@ -127,11 +131,9 @@ else:
         colP1.metric("30-Day Rainfall Trend", f"{risk['totalRain30d']} mm")
         colP2.metric("Soil Moisture Index", f"{risk['avgSoil']}%", delta="Root-Zone Level")
 
-        st.markdown(f"""
-        ### 📋 Active Advisory Bulletin
-        - **Risk Status:** `{advisory['level']}`
-        - **Recommended Action:** {advisory['action']}
-        """)
+        with st.container(border=True):
+            st.markdown(f"**Risk Status:** `{advisory['level']}`")
+            st.markdown(f"**Recommended Action:** {advisory['action']}")
 
         st.markdown("#### 📅 Next 5-Day Meteorological Forecast Preview")
         forecastPreview = df[['date', 'tempMax', 'rainfall', 'soilMoisturePercent']].tail(5).copy()
@@ -156,7 +158,7 @@ else:
         st.markdown("---")
         st.subheader("🚨 Parametric Insurance Alert")
 
-        with st.container():
+        with st.container(border=True):
             st.warning(f"""
             **EARLY WARNING DETECTED**  
             📅 **Date:** {datetime.now().strftime('%d %b %Y')}  
@@ -223,16 +225,11 @@ else:
         st.subheader("🌿 Sustainable Crop Companion & Intercropping Advisor")
         st.caption("Science-backed companion recommendations curated from agricultural research extension guides.")
 
-        st.info(f"""
-        **Main Registered Crop:** `{crop}`  
-        **Recommended Intercropping / Companion Match:** `{companionInfo['companion']}`  
-        
-        **Potential Sustainability Benefits:**  
-        {companionInfo['benefits']}  
-        
-        **Agronomic Verification Conditions:**  
-        {companionInfo['conditions']}
-        """)
+        with st.container(border=True):
+            st.markdown(f"**Main Registered Crop:** `{crop}`")
+            st.markdown(f"**Recommended Intercropping / Companion Match:** `{companionInfo['companion']}`")
+            st.markdown(f"**Potential Sustainability Benefits:** {companionInfo['benefits']}")
+            st.markdown(f"**Agronomic Verification Conditions:** {companionInfo['conditions']}")
 
     st.markdown("---")
     st.markdown("#### 💬 Ask the Hybrid AI Sustainability Advisor")
