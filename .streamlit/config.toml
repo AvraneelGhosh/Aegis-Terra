@@ -11,5 +11,5 @@ secondaryBackgroundColor = "#334037"
 # Main text color (Headers, body text): Crisp, warm parchment cream
 textColor = "#FFF5E6"
 
-# Font family
-font = "sans serif"
+# Font family: Editorial Serif for a classic, sophisticated journal feel
+font = "serif"
