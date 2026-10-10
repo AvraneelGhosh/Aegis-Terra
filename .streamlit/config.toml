@@ -5,8 +5,8 @@ primaryColor = "#D97757"
 # Main background color (App body): Deep organic forest olive green
 backgroundColor = "#26302A"
 
-# Sidebar and container background color (Sidebar, cards): Muted warm stone/earth
-secondaryBackgroundColor = "#3B423C"
+# Sidebar and container background color (Sidebar, cards): Muted earthy cocoa/clay brown
+secondaryBackgroundColor = "#42342C"
 
 # Main text color (Headers, body text): Crisp warm parchment cream for readability
 textColor = "#FFF5E6"
