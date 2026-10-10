@@ -10,15 +10,15 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from DataPipeline import fetchWeatherData, generateTelemetryData
 from RiskEngine import calculateRiskIndex, generateAiPrecautions
-from App import getSharedState
+from GlobalState import getSharedState
 
 # Page Config styled for Mobile / Low-Tech simulation
 st.set_page_config(page_title="Aegis Terra - Farmer Portal", page_icon="🌾", layout="centered")
 
-# Fetch Shared Global Cache across all devices
+# Fetch Centralized State
 state = getSharedState()
 
-# Initialize Page-Specific Chat History (Isolated to current user session)
+# Initialize Page-Specific Chat History
 if 'chatHistory' not in st.session_state:
     st.session_state.chatHistory = []
 
@@ -68,7 +68,7 @@ if portalMode == "📝 New Farmer Self-Registration":
                     "policyValue": estimatedPolicy
                 }
 
-                # Concatenate directly into global shared state memory
+                # Mutate central state directly
                 state["farmerDatabase"] = pd.concat([
                     state["farmerDatabase"], 
                     pd.DataFrame([newFarmerObj])
@@ -109,7 +109,6 @@ else:
     st.markdown("---")
     st.subheader("🚨 Active Regional Weather Alert")
 
-    # Alert Banner
     with st.container():
         st.warning(f"""
         **EARLY WARNING ALERT DETECTED**  
@@ -121,7 +120,6 @@ else:
         Your parametric policy qualifies for an advance payout of **${policyValue}.00**.
         """)
 
-    # Quick Action Buttons
     btnCol1, btnCol2 = st.columns(2)
 
     with btnCol1:
@@ -133,7 +131,6 @@ else:
             if confidence >= 90:
                 success, msg = state["security"].processPayout(policyValue)
                 if success:
-                    # Update global shared total
                     state["totalPayoutsExecuted"] += policyValue
                     
                     newRecord = {
@@ -146,7 +143,6 @@ else:
                         "confidence": confidence,
                         "notes": "Claimed via Mobile Portal"
                     }
-                    # Concatenate directly into global shared ledger
                     state["claimLedger"] = pd.concat([state["claimLedger"], pd.DataFrame([newRecord])], ignore_index=True)
                     
                     responseMsg = f"🎉 **Payout Approved!**\n\n**${policyValue}.00** transferred via Instant Settlement. Txn ID: `TXN-{int(time.time())}`"
