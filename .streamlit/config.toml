@@ -1,15 +1,15 @@
 [theme]
-# Primary accent color (Buttons, active tabs, sliders): Soft sage green that pops against the dark background
-primaryColor = "#A4B494"
+# Primary accent color (Buttons, active tabs, sliders): Muted warm clay/coffee brown
+primaryColor = "#A36B4E"
 
-# Main background color (App body): Deep organic forest olive green from the dark tones in the image
+# Main background color (App body): Deep organic forest olive green
 backgroundColor = "#26302A"
 
 # Sidebar and container background color (Sidebar, cards): Slightly lighter muted olive tone
 secondaryBackgroundColor = "#35423B"
 
-# Main text color (Headers, body text): Soft warm parchment cream for high readability
-textColor = "#F4F0E8"
+# Main text color (Headers, body text): Noticeable warm parchment cream for crisp legibility
+textColor = "#FFF5E6"
 
 # Font family
 font = "sans serif"
