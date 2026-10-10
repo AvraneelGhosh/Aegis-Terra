@@ -138,7 +138,6 @@ with mapTab:
         )
         st.info("💡 **Map Controls:**\n\nToggle layers to inspect regional drought hotspots. Hover over pins for real-time farm telemetry.")
 
-    # Re-evaluate live database rows dynamically
     mapDataList = []
     for row in state["farmerDatabase"]:
         fWeather = fetchWeatherData(float(row["lat"]), float(row["lon"]))
@@ -201,7 +200,7 @@ with mapTab:
 
         figMap.update_layout(map_style="open-street-map", autosize=True)
         st.plotly_chart(figMap, use_container_width=True, key=f"heatmap_{len(mapDf)}")
-        
+
 # -------------------------------------------------------------------
 # TAB 3: AUDITOR CLAIM CONFIRMATION PAGE & FINANCIAL LEDGER
 # -------------------------------------------------------------------

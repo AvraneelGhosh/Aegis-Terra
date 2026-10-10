@@ -246,7 +246,6 @@ else:
         st.session_state.chatHistory.append({"role": "user", "content": userPrompt})
         cleanPrompt = userPrompt.strip().upper()
         
-        # Handle quick payout command
         if cleanPrompt in ["YES", "Y", "CLAIM"]:
             confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
             if confidence >= 90:
@@ -286,7 +285,6 @@ else:
                 })
                 st.rerun()
         else:
-            # Call Generative AI Advisor with structured telemetry ground-truth
             aiResponse = queryGenerativeClimateAdvisor(
                 farmerName=farmerName,
                 crop=crop,

@@ -1,7 +1,16 @@
+<<<<<<< HEAD
 streamlit
 pandas
 numpy
 plotly
 requests
 scikit-learn
+=======
+streamlit
+pandas
+numpy
+plotly
+requests
+scikit-learn
+>>>>>>> 6ae9299 (Add google-genai to requirements.txt)
 google-genai
