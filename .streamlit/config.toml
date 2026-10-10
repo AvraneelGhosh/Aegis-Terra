@@ -1,6 +1,6 @@
 [theme]
-primaryColor = "#D4A373"          # Warm striking amber/gold
-backgroundColor = "#1C1816"       # Deep espresso dark brown
-secondaryBackgroundColor = "#2C2623" # Soft dark mahogany cards
-textColor = "#FEFAE0"             # Bright warm cream
+primaryColor = "#E07A5F"          # Vibrant warm terracotta
+backgroundColor = "#1F1A17"       # Deep dark clay-charcoal
+secondaryBackgroundColor = "#2D2520" # Muted dark earth tone
+textColor = "#F4F1DE"             # Crisp parchment cream
 font = "sans serif"
