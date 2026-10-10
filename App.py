@@ -61,9 +61,14 @@ with mainTab:
     policyValue = int(farmerDetails["policyValue"])
     
     with st.sidebar.container(border=True):
-        st.markdown(f"**Policy ID:** {farmerDetails['farmerId']}")
-        st.markdown(f"**Phone:** {farmerDetails['phone']}")
-        st.markdown(f"**Farm Area:** {farmerDetails['acres']} Acres")
+        st.markdown(f"**Policy ID:** `{farmerDetails['farmerId']}`")
+        st.markdown(f"**Phone:** `{farmerDetails['phone']}`")
+        st.markdown(f"**Farm Area:** `{farmerDetails['acres']} Acres`")
+        
+        with st.popover("ℹ️ Policy Rules & Thresholds"):
+            st.markdown("**Deductible:** `0%`")
+            st.markdown("**Parametric Trigger:** 30-Day Rain < 20mm or Temp > 38°C")
+            st.markdown("**Max Single Settlement:** `₹1,00,000`")
 
     weatherDf = fetchWeatherData(lat, lon)
     df = generateTelemetryData(weatherDf)
@@ -86,7 +91,7 @@ with mainTab:
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("30-Day Rainfall", f"{risk['totalRain30d']} mm", delta="-12mm vs Avg", delta_color="inverse")
     col2.metric("Average Max Temp", f"{risk['avgTemp']} °C", delta="+3°C vs Avg", delta_color="inverse")
-    col3.metric("Satellite NDVI Index", f"{risk['avgNdvi']}", delta="-0.15 vs Avg", delta_color="inverse")
+    col3.metric("Satellite NDVI Index", f"{risk['avgNdvi']}", delta="-0.15 Stress", delta_color="inverse")
     col4.metric("Composite Risk Score", f"{risk['compositeRisk']} / 1.0", delta=advisory['level'])
     col5.metric("ML Risk Prediction", f"{int(mlRiskScore * 100)}% Risk", delta="Random Forest")
 
@@ -95,18 +100,29 @@ with mainTab:
     c1, c2 = st.columns([2, 1])
     with c1:
         st.subheader(f"Micro-Climate Telemetry ({farmerDetails['name']} - {crop})")
+        
+        # Styled Plotly Chart Matching Botanical Theme
         fig = px.line(df, x='date', y=['tempMax', 'soilMoisturePercent', 'rainfall'], 
                       title="30-Day Environmental Metrics Trend")
-        fig.update_layout(margin=dict(l=20, r=20, t=30, b=20))
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#FFF5E6'),
+            colorway=['#A36B4E', '#81B29A', '#D97757'],
+            margin=dict(l=20, r=20, t=40, b=20),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis=dict(showgrid=False, zeroline=False),
+            yaxis=dict(showgrid=True, gridcolor='#334037')
+        )
         st.plotly_chart(fig, use_container_width=True)
         
     with c2:
-        st.subheader("🔒 Security & Circuit Breaker Status")
+        st.subheader("🔒 Security & Circuit Breaker")
         confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
         
         with st.container(border=True):
-            st.write(f"**Validation Confidence Score:** `{confidence}%`")
-            st.write(f"**Claim Evaluation Status:** `{claimStatus}`")
+            st.write(f"**Validation Confidence:** `{confidence}%`")
+            st.write(f"**Claim Evaluation:** `{claimStatus}`")
             if flags:
                 st.write("**Anomaly Flags Raised:**")
                 for flag in flags:
@@ -134,7 +150,7 @@ with mapTab:
             "Select Heatmap Layer:",
             ["Temperature (°C)", "Rainfall (mm)", "Soil Moisture (%)", "Satellite NDVI Index"]
         )
-        st.info("💡 **Map Controls:**\n\nToggle layers to inspect regional drought hotspots. Hover over pins for real-time farm telemetry.")
+        st.info("💡 **Map Controls:**\n\nToggle layers to inspect drought hotspots. Hover over pins for live farm telemetry.")
 
     mapDataList = []
     for row in state["farmerDatabase"]:
@@ -196,7 +212,13 @@ with mapTab:
         for trace in figScatter.data:
             figMap.add_trace(trace)
 
-        figMap.update_layout(map_style="open-street-map", autosize=True, margin=dict(l=0, r=0, t=30, b=0))
+        figMap.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='#FFF5E6'),
+            map_style="open-street-map", 
+            autosize=True, 
+            margin=dict(l=0, r=0, t=30, b=0)
+        )
         st.plotly_chart(figMap, use_container_width=True, key=f"heatmap_{len(mapDf)}")
 
 # -------------------------------------------------------------------
@@ -261,7 +283,17 @@ with auditTab:
 
     st.markdown("---")
     st.subheader("📜 Executed Payout & Audit History Ledger")
-    st.dataframe(pd.DataFrame(state["claimLedger"]), use_container_width=True)
+    
+    # Enhanced Dataframe with Column Config
+    st.dataframe(
+        pd.DataFrame(state["claimLedger"]), 
+        column_config={
+            "amount": st.column_config.NumberColumn("Payout Amount", format="₹%d"),
+            "confidence": st.column_config.ProgressColumn("AI Confidence", format="%d%%", min_value=0, max_value=100)
+        },
+        hide_index=True,
+        use_container_width=True
+    )
 
 # -------------------------------------------------------------------
 # TAB 4: FARMER REGISTRATION PORTAL
@@ -312,4 +344,13 @@ with registerTab:
 
     st.markdown("---")
     st.subheader("📋 Active Registered Farmers Database")
-    st.dataframe(pd.DataFrame(state["farmerDatabase"]), use_container_width=True)
+    
+    st.dataframe(
+        pd.DataFrame(state["farmerDatabase"]),
+        column_config={
+            "policyValue": st.column_config.NumberColumn("Policy Value", format="₹%d"),
+            "acres": st.column_config.NumberColumn("Acres", format="%.1f Acres")
+        },
+        hide_index=True,
+        use_container_width=True
+    )

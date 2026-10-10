@@ -75,7 +75,6 @@ if portalMode == "📝 New Farmer Self-Registration":
                         "policyValue": estimatedPolicy
                     }
 
-                    # Mutate shared central list in-place
                     state["farmerDatabase"].append(newFarmerObj)
 
                     st.success(f"🎉 Welcome aboard, {regName}! Policy `{newId}` is active with `₹{estimatedPolicy:,}` coverage.")
@@ -91,7 +90,6 @@ else:
     farmerNames = [f["name"] for f in state["farmerDatabase"]]
     selectedFarmer = st.selectbox("👤 Select Your Account:", farmerNames)
 
-    # Clean dictionary lookup
     farmerDetails = next((f for f in state["farmerDatabase"] if f["name"] == selectedFarmer), state["farmerDatabase"][0])
 
     farmerName = farmerDetails["name"]
@@ -106,7 +104,7 @@ else:
         st.markdown(f"**Policy ID:** `{policyId}` &nbsp;|&nbsp; **Crop:** {crop} ({acres} Acres)")
         st.markdown(f"**Coverage:** `₹{policyValue:,}` &nbsp;|&nbsp; **Phone:** {farmerDetails['phone']}")
 
-    # Fetch Real-Time Location Weather Telemetry & Decision Engine
+    # Fetch Real-Time Weather Telemetry
     weatherDf = fetchWeatherData(lat, lon)
     df = generateTelemetryData(weatherDf)
     risk = calculateRiskIndex(df)
@@ -138,7 +136,18 @@ else:
         st.markdown("#### 📅 Next 5-Day Meteorological Forecast Preview")
         forecastPreview = df[['date', 'tempMax', 'rainfall', 'soilMoisturePercent']].tail(5).copy()
         forecastPreview.columns = ['Date', 'Max Temp (°C)', 'Rainfall (mm)', 'Est. Soil Moisture (%)']
-        st.dataframe(forecastPreview, use_container_width=True)
+        
+        # Formatted Forecast Dataframe
+        st.dataframe(
+            forecastPreview,
+            column_config={
+                "Est. Soil Moisture (%)": st.column_config.ProgressColumn("Soil Moisture", format="%d%%", min_value=0, max_value=100),
+                "Max Temp (°C)": st.column_config.NumberColumn("Max Temp", format="%d °C"),
+                "Rainfall (mm)": st.column_config.NumberColumn("Precipitation", format="%.1f mm")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
 
     # -------------------------------------------------------------
     # SUB-TAB 2: INTELLIGENT IRRIGATION & PARAMETRIC PAYOUT
@@ -146,14 +155,13 @@ else:
     with portalTab2:
         st.subheader("💧 Intelligent Irrigation & Claim Settlement")
         
-        # Irrigation Decision Logic
         recentRain = float(df['rainfall'].tail(3).sum())
         soilMoist = float(df['soilMoisturePercent'].iloc[-1])
         
         if recentRain > 15.0 or soilMoist > 60:
-            st.success("🌧️ **Irrigation Advisory: POSTPONE WATERING**\n\nRecent precipitation is sufficient in your root zone. Skipping unnecessary irrigation conserves valuable groundwater and pump energy.")
+            st.success("🌧️ **Irrigation Advisory: POSTPONE WATERING**\n\nRecent precipitation is sufficient in your root zone. Skipping unnecessary irrigation conserves valuable groundwater.")
         else:
-            st.warning("☀️ **Irrigation Advisory: SCHEDULE RECOMMENDED**\n\nSoil moisture is trending low due to high ambient temperatures. Consider light morning or evening micro-irrigation.")
+            st.warning("☀️ **Irrigation Advisory: SCHEDULE RECOMMENDED**\n\nSoil moisture is trending low due to high ambient temperatures. Consider light micro-irrigation.")
 
         st.markdown("---")
         st.subheader("🚨 Parametric Insurance Alert")
@@ -227,9 +235,9 @@ else:
 
         with st.container(border=True):
             st.markdown(f"**Main Registered Crop:** `{crop}`")
-            st.markdown(f"**Recommended Intercropping / Companion Match:** `{companionInfo['companion']}`")
-            st.markdown(f"**Potential Sustainability Benefits:** {companionInfo['benefits']}")
-            st.markdown(f"**Agronomic Verification Conditions:** {companionInfo['conditions']}")
+            st.markdown(f"**Recommended Companion Match:** `{companionInfo['companion']}`")
+            st.markdown(f"**Sustainability Benefits:** {companionInfo['benefits']}")
+            st.markdown(f"**Agronomic Conditions:** {companionInfo['conditions']}")
 
     st.markdown("---")
     st.markdown("#### 💬 Ask the Hybrid AI Sustainability Advisor")
