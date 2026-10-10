@@ -1,15 +1,15 @@
 [theme]
-# Primary accent color (Buttons, active states, active tabs): Rich botanical olive-green from the books/mug
-primaryColor = "#4A5D4E"
+# Primary accent color (Buttons, active tabs, sliders): Soft sage green that pops against the dark background
+primaryColor = "#A4B494"
 
-# Main background color (App body): Soft cream parchment tone from the open book pages
-backgroundColor = "#F4F0E8"
+# Main background color (App body): Deep organic forest olive green from the dark tones in the image
+backgroundColor = "#26302A"
 
-# Sidebar and container background color (Sidebar, cards): Slightly deeper muted warm stone
-secondaryBackgroundColor = "#E5DFD3"
+# Sidebar and container background color (Sidebar, cards): Slightly lighter muted olive tone
+secondaryBackgroundColor = "#35423B"
 
-# Main text color (Headers, body text): Deep organic charcoal-green for high contrast and readability
-textColor = "#2D3730"
+# Main text color (Headers, body text): Soft warm parchment cream for high readability
+textColor = "#F4F0E8"
 
 # Font family
 font = "sans serif"
