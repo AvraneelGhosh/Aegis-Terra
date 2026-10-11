@@ -12,7 +12,6 @@ def trainRiskModel():
     np.random.seed(42)
     nSamples = 1000
     
-    # Corrected feature range: 30-day rainfall spanning 0 to 500 mm
     rain = np.random.uniform(0, 500, nSamples)
     temp = np.random.uniform(20, 45, nSamples)
     soil = np.random.uniform(10, 80, nSamples)
