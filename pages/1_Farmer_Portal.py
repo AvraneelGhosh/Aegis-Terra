@@ -1,12 +1,6 @@
 import streamlit as st
 import pandas as pd
-import time
 from datetime import datetime
-import sys
-import os
-
-# Append parent directory to sys.path so scripts inside /pages can import root modules
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from DataPipeline import fetchWeatherData, generateTelemetryData
 from RiskEngine import (
@@ -18,289 +12,198 @@ from RiskEngine import (
 from GlobalState import getSharedState
 
 # Page Configuration
-st.set_page_config(page_title="Aegis Terra - Farmer Portal", layout="centered", page_icon="🌾")
+st.set_page_config(page_title="Aegis Terra - Farmer Portal", layout="wide", page_icon="🌾")
 
-# Fetch Centralized Shared State across pages/devices
+st.title("🌾 Aegis Terra: Farmer Self-Service Portal")
+st.caption("Real-time parametric policy tracking, micro-climate telemetry, and instant claim execution.")
+
+# Fetch Centralized Shared State
 state = getSharedState()
 
-# Initialize Page-Specific Chat History
-if 'chatHistory' not in st.session_state:
-    st.session_state.chatHistory = []
+# 15 Most Sown Crops in India
+CROP_LIST = [
+    "Rice / Paddy", "Wheat", "Maize (Corn)", "Bajra (Pearl Millet)", 
+    "Jowar (Sorghum)", "Ragi (Finger Millet)", "Pulses (Gram / Tur / Lentils)", 
+    "Soybean", "Groundnut (Peanut)", "Mustard (Rapeseed)", "Sugarcane", 
+    "Cotton", "Jute", "Tea", "Coffee"
+]
 
-st.title("🌾 Aegis Terra Mobile Portal")
-st.caption("Proactive Climate Intelligence & Parametric Insurance Self-Service")
+# Sidebar Selection
+st.sidebar.subheader("👤 Active Farmer Account")
+farmerList = [f["name"] for f in state["farmerDatabase"]]
+selectedFarmerName = st.sidebar.selectbox("Select Your Profile", farmerList)
 
-# Top Bar Mode Selector
-portalMode = st.radio("Select Portal Action:", ["👤 Existing Farmer Portal", "📝 New Farmer Self-Registration"], horizontal=True)
+farmerDetails = next((f for f in state["farmerDatabase"] if f["name"] == selectedFarmerName), state["farmerDatabase"][0])
 
-st.markdown("---")
+if st.sidebar.button("🔄 Refresh Telemetry Data", use_container_width=True):
+    st.rerun()
 
-# ===================================================================
-# MODE 1: NEW FARMER SELF-REGISTRATION
-# ===================================================================
-if portalMode == "📝 New Farmer Self-Registration":
-    st.subheader("📝 Register Your Farm for Insurance & Climate AI")
-    st.caption("Enroll in automated parametric coverage and proactive climate advisories in under 60 seconds.")
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Farmer Assistance:**\n\nParametric insurance automatically monitors weather and soil indices to disburse funds without manual paperwork or delays.")
 
-    with st.container(border=True):
-        with st.form("farmerSelfRegForm", clear_on_submit=True):
-            regName = st.text_input("Full Name", placeholder="e.g. Ananya Reddy")
-            regPhone = st.text_input("Mobile / WhatsApp Number", placeholder="+919876543210")
-            
-            colA, colB = st.columns(2)
-            with colA:
-                regCrop = st.selectbox("Crop Type", ["Rice / Paddy", "Wheat", "Maize", "Cotton", "Sugarcane"])
-                regAcres = st.number_input("Farm Size (Acres)", min_value=0.5, max_value=50.0, value=2.0, step=0.5)
-            with colB:
-                regLat = st.number_input("Farm Latitude (GPS)", value=12.9200, format="%.4f")
-                regLon = st.number_input("Farm Longitude (GPS)", value=79.1300, format="%.4f")
+# Navigation Tabs within Farmer Portal
+portalTab1, portalTab2, portalTab3 = st.tabs([
+    "📊 My Active Policy & Telemetry", 
+    "🌿 Companion Advisory & AI Assistant",
+    "📝 Register New Field / Policy"
+])
 
-            estimatedPolicy = int(regAcres * 10000) # ₹10,000 per acre coverage
-            st.info(f"💡 **Estimated Policy Coverage:** `₹{estimatedPolicy:,}.00` (Calculated at ₹10,000/acre)")
-
-            btnSubmitReg = st.form_submit_button("🚀 Activate My Policy & Climate Advisor")
-
-            if btnSubmitReg:
-                if regName and regPhone:
-                    newId = f"FARM{101 + len(state['farmerDatabase'])}"
-                    
-                    newFarmerObj = {
-                        "farmerId": newId,
-                        "name": regName.strip(),
-                        "phone": regPhone.strip(),
-                        "lat": float(regLat),
-                        "lon": float(regLon),
-                        "crop": regCrop,
-                        "acres": float(regAcres),
-                        "policyValue": estimatedPolicy
-                    }
-
-                    state["farmerDatabase"].append(newFarmerObj)
-
-                    st.success(f"🎉 Welcome aboard, {regName}! Policy `{newId}` is active with `₹{estimatedPolicy:,}` coverage.")
-                    st.toast("Registration complete! Switch to 'Existing Farmer Portal' to view active AI advisories.")
-                    st.rerun()
-                else:
-                    st.error("Please provide both your Name and Mobile Number.")
-
-# ===================================================================
-# MODE 2: EXISTING FARMER PORTAL & AI SUSTAINABILITY ADVISOR
-# ===================================================================
-else:
-    farmerNames = [f["name"] for f in state["farmerDatabase"]]
-    selectedFarmer = st.selectbox("👤 Select Your Account:", farmerNames)
-
-    farmerDetails = next((f for f in state["farmerDatabase"] if f["name"] == selectedFarmer), state["farmerDatabase"][0])
-
-    farmerName = farmerDetails["name"]
-    policyId = farmerDetails["farmerId"]
-    crop = farmerDetails["crop"]
-    acres = float(farmerDetails["acres"])
-    policyValue = int(farmerDetails["policyValue"])
+# -------------------------------------------------------------------
+# TAB 1: MY ACTIVE POLICY & TELEMETRY
+# -------------------------------------------------------------------
+with portalTab1:
+    st.subheader(f"Policy Dashboard: {farmerDetails['name']} ({farmerDetails['farmerId']})")
+    
     lat = float(farmerDetails["lat"])
     lon = float(farmerDetails["lon"])
-
-    with st.container(border=True):
-        st.markdown(f"**Policy ID:** `{policyId}` &nbsp;|&nbsp; **Crop:** {crop} ({acres} Acres)")
-        st.markdown(f"**Coverage:** `₹{policyValue:,}` &nbsp;|&nbsp; **Phone:** {farmerDetails['phone']}")
-
-    # Fetch Real-Time Weather Telemetry
+    crop = farmerDetails["crop"]
+    policyValue = int(farmerDetails["policyValue"])
+    acres = float(farmerDetails["acres"])
+    
+    # Fetch Live or Fallback Telemetry Data
     weatherDf = fetchWeatherData(lat, lon)
     df = generateTelemetryData(weatherDf)
+    dataSourceStatus = df["sourceStatus"].iloc[0]
+    
     risk = calculateRiskIndex(df)
     advisory = generateAiPrecautions(risk)
-    companionInfo = getCompanionAdvisory(crop)
-
-    # SUB-TABS FOR MOBILE PORTAL FEATURES
-    portalTab1, portalTab2, portalTab3 = st.tabs([
-        "🌦️ 5-Day Climate Advisor", 
-        "💧 Irrigation & Payout", 
-        "🌿 Sustainable Companion Advisor"
-    ])
-
-    # -------------------------------------------------------------
-    # SUB-TAB 1: 5-DAY PROACTIVE CLIMATE INTELLIGENCE
-    # -------------------------------------------------------------
-    with portalTab1:
-        st.subheader("🤖 Aegis Terra 5-Day Climate Outlook")
-        st.caption("Proactive AI advisories synthesized from hyper-local meteorological telemetry.")
-
-        colP1, colP2 = st.columns(2)
-        colP1.metric("30-Day Rainfall Trend", f"{risk['totalRain30d']} mm")
-        colP2.metric("Soil Moisture Index", f"{risk['avgSoil']}%", delta="Root-Zone Level")
-
-        with st.container(border=True):
-            st.markdown(f"**Risk Status:** `{advisory['level']}`")
-            st.markdown(f"**Recommended Action:** {advisory['action']}")
-
-        st.markdown("#### 📅 Next 5-Day Meteorological Forecast Preview")
-        forecastPreview = df[['date', 'tempMax', 'rainfall', 'soilMoisturePercent']].tail(5).copy()
-        forecastPreview.columns = ['Date', 'Max Temp (°C)', 'Rainfall (mm)', 'Est. Soil Moisture (%)']
-        
-        # Formatted Forecast Dataframe
-        st.dataframe(
-            forecastPreview,
-            column_config={
-                "Est. Soil Moisture (%)": st.column_config.ProgressColumn("Soil Moisture", format="%d%%", min_value=0, max_value=100),
-                "Max Temp (°C)": st.column_config.NumberColumn("Max Temp", format="%d °C"),
-                "Rainfall (mm)": st.column_config.NumberColumn("Precipitation", format="%.1f mm")
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-
-    # -------------------------------------------------------------
-    # SUB-TAB 2: INTELLIGENT IRRIGATION & PARAMETRIC PAYOUT
-    # -------------------------------------------------------------
-    with portalTab2:
-        st.subheader("💧 Intelligent Irrigation & Claim Settlement")
-        
-        recentRain = float(df['rainfall'].tail(3).sum())
-        soilMoist = float(df['soilMoisturePercent'].iloc[-1])
-        
-        if recentRain > 15.0 or soilMoist > 60:
-            st.success("🌧️ **Irrigation Advisory: POSTPONE WATERING**\n\nRecent precipitation is sufficient in your root zone. Skipping unnecessary irrigation conserves valuable groundwater.")
-        else:
-            st.warning("☀️ **Irrigation Advisory: SCHEDULE RECOMMENDED**\n\nSoil moisture is trending low due to high ambient temperatures. Consider light micro-irrigation.")
-
-        st.markdown("---")
-        st.subheader("🚨 Parametric Insurance Alert")
-
-        with st.container(border=True):
-            st.warning(f"""
-            **EARLY WARNING DETECTED**  
-            📅 **Date:** {datetime.now().strftime('%d %b %Y')}  
-            🌾 **Crop:** {crop}  
-            📊 **Composite Risk Score:** `{risk['compositeRisk']}/1.0`  
-            
-            Your parametric policy qualifies for an advance financial support payout of **₹{policyValue:,}.00**.
-            """)
-
-        btnCol1, btnCol2 = st.columns(2)
-
-        with btnCol1:
-            if st.button("✅ Request Instant Payout", use_container_width=True):
-                st.session_state.chatHistory.append({"role": "user", "content": "YES"})
-                
-                confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
-                
-                if confidence >= 90:
-                    success, msg = state["security"].processPayout(policyValue)
-                    if success:
-                        state["totalPayoutsExecuted"] += policyValue
-                        
-                        newRecord = {
-                            "claimId": f"CLM{8001 + len(state['claimLedger'])}",
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "farmerName": farmerName,
-                            "policyId": policyId,
-                            "amount": policyValue,
-                            "status": "AUTO APPROVED",
-                            "confidence": confidence,
-                            "notes": "Claimed via Mobile Portal"
-                        }
-                        state["claimLedger"].append(newRecord)
-                        
-                        responseMsg = f"🎉 **Payout Approved!**\n\n**₹{policyValue:,}.00** transferred via Instant Settlement. Txn ID: `TXN-{int(time.time())}`"
-                        st.session_state.chatHistory.append({"role": "assistant", "content": responseMsg})
-                        st.rerun()
-                    else:
-                        st.session_state.chatHistory.append({"role": "assistant", "content": f"🚨 Payout Error: {msg}"})
-                else:
-                    newPending = {
-                        "claimId": f"CLM{8001 + len(state['claimLedger']) + len(state['pendingClaims'])}",
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "farmerName": farmerName,
-                        "policyId": policyId,
-                        "amount": policyValue,
-                        "confidence": confidence,
-                        "reason": ", ".join(flags) if flags else "Low confidence score evaluation"
-                    }
-                    state["pendingClaims"].append(newPending)
-                    responseMsg = f"⏳ **Claim Flagged for Review**\n\nReason: {', '.join(flags)}. Sent to Auditor queue."
-                    st.session_state.chatHistory.append({"role": "assistant", "content": responseMsg})
-                    st.rerun()
-
-        with btnCol2:
-            if st.button("❌ Decline & Reserve Funds", use_container_width=True):
-                st.session_state.chatHistory.append({"role": "user", "content": "NO"})
-                st.session_state.chatHistory.append({"role": "assistant", "content": "ℹ️ Request acknowledged. Policy reserves remain active for future risks."})
-
-    # -------------------------------------------------------------
-    # SUB-TAB 3: SUSTAINABLE CROP COMPANION ADVISOR
-    # -------------------------------------------------------------
-    with portalTab3:
-        st.subheader("🌿 Sustainable Crop Companion & Intercropping Advisor")
-        st.caption("Science-backed companion recommendations curated from agricultural research extension guides.")
-
-        with st.container(border=True):
-            st.markdown(f"**Main Registered Crop:** `{crop}`")
-            st.markdown(f"**Recommended Companion Match:** `{companionInfo['companion']}`")
-            st.markdown(f"**Sustainability Benefits:** {companionInfo['benefits']}")
-            st.markdown(f"**Agronomic Conditions:** {companionInfo['conditions']}")
+    
+    # Overview Metrics
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Policy ID", farmerDetails["farmerId"])
+    col2.metric("Covered Crop", crop)
+    col3.metric("Land Area", f"{acres} Acres")
+    col4.metric("Max Coverage Value", f"₹{policyValue:,}")
 
     st.markdown("---")
-    st.markdown("#### 💬 Ask the Hybrid AI Sustainability Advisor")
 
-    for message in st.session_state.chatHistory:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    mCol1, mCol2 = st.columns([1, 1])
 
-    userPrompt = st.chat_input("Ask about irrigation, companion crops, or reply YES to claim...")
-    if userPrompt:
-        st.session_state.chatHistory.append({"role": "user", "content": userPrompt})
-        cleanPrompt = userPrompt.strip().upper()
+    with mCol1:
+        st.subheader("🌡️ Micro-Climate Telemetry")
+        st.markdown(f"**Data Lineage Source:** `{dataSourceStatus}`")
+        st.write(f"**30-Day Total Rainfall:** `{risk['totalRain30d']} mm`")
+        st.write(f"**Average Max Temperature:** `{risk['avgTemp']} °C`")
+        st.write(f"**Average Soil Moisture:** `{risk['avgSoil']}%` (Derived)")
+        st.write(f"**Satellite NDVI Index:** `{risk['avgNdvi']}` (Simulated)")
+        st.write(f"**Composite Drought Risk Score:** `{risk['compositeRisk']} / 1.0`")
         
-        if cleanPrompt in ["YES", "Y", "CLAIM"]:
-            confidence, claimStatus, flags = state["security"].validateClaim(df, risk)
-            if confidence >= 90:
-                success, msg = state["security"].processPayout(policyValue)
-                if success:
-                    state["totalPayoutsExecuted"] += policyValue
-                    newRecord = {
-                        "claimId": f"CLM{8001 + len(state['claimLedger'])}",
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "farmerName": farmerName,
-                        "policyId": policyId,
-                        "amount": policyValue,
-                        "status": "AUTO APPROVED",
-                        "confidence": confidence,
-                        "notes": "Claimed via Chat Assistant"
-                    }
-                    state["claimLedger"].append(newRecord)
-                    st.session_state.chatHistory.append({
-                        "role": "assistant", 
-                        "content": f"🎉 **Payout Approved!** **₹{policyValue:,}.00** transferred to linked bank account."
-                    })
-                    st.rerun()
-            else:
-                newPending = {
-                    "claimId": f"CLM{8001 + len(state['claimLedger']) + len(state['pendingClaims'])}",
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "farmerName": farmerName,
-                    "policyId": policyId,
-                    "amount": policyValue,
-                    "confidence": confidence,
-                    "reason": ", ".join(flags) if flags else "Low confidence score evaluation"
-                }
-                state["pendingClaims"].append(newPending)
-                st.session_state.chatHistory.append({
-                    "role": "assistant", 
-                    "content": "⏳ Claim Flagged for Auditor Review."
-                })
-                st.rerun()
+        with st.container(border=True):
+            st.markdown(f"**Assessment Status:** {advisory['level']}")
+            st.markdown(f"**Recommended Action:** {advisory['action']}")
+
+    with mCol2:
+        st.subheader("⚡ Parametric Payout Qualification")
+        
+        if risk['compositeRisk'] >= 0.4:
+            payoutEligibleAmount = int(policyValue * 0.5)
+            st.error(f"⚠️ **Parametric Threshold Breached!**")
+            st.markdown(f"Your farm has experienced climate stress exceeding normal historical bounds. You qualify for an advance parametric payout of **₹{payoutEligibleAmount:,}**.")
+            
+            btnCol1, btnCol2 = st.columns(2)
+            with btnCol1:
+                if st.button("✅ Request Instant Payout", use_container_width=True):
+                    success, failMsg = state["security"].processPayout(payoutEligibleAmount)
+                    if success:
+                        state["totalPayoutsExecuted"] += payoutEligibleAmount
+                        newClaim = {
+                            "claimId": f"CLM-{1000 + len(state['claimLedger'])}",
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "farmerName": farmerDetails["name"],
+                            "policyId": farmerDetails["farmerId"],
+                            "amount": payoutEligibleAmount,
+                            "status": "AUTO APPROVED",
+                            "confidence": 95,
+                            "notes": "Automated parametric execution via mobile portal trigger"
+                        }
+                        state["claimLedger"].append(newClaim)
+                        st.success("🎉 Payout processed successfully! Funds transferred to registered bank account.")
+                        st.rerun()
+                    else:
+                        st.error(f"🚨 Payout Blocked: {failMsg}")
+            with btnCol2:
+                if st.button("❌ Hold Funds in Reserve", use_container_width=True):
+                    st.info("Payout request deferred. Funds remain secured in escrow.")
         else:
-            aiResponse = queryGenerativeClimateAdvisor(
-                farmerName=farmerName,
-                crop=crop,
-                acres=acres,
-                riskData=risk,
-                advisoryData=advisory,
-                companionData=companionInfo,
-                userQuery=userPrompt
-            )
-            st.session_state.chatHistory.append({
-                "role": "assistant", 
-                "content": aiResponse
-            })
-            st.rerun()
+            st.success("🟢 **Optimal Growing Conditions**")
+            st.markdown("Your farm's 30-day weather and soil metrics are well within safe thresholds. No parametric triggers activated.")
+
+# -------------------------------------------------------------------
+# TAB 2: COMPANION ADVISORY & AI ASSISTANT
+# -------------------------------------------------------------------
+with portalTab2:
+    st.subheader("🌿 Sustainable Agriculture & Companion Planting")
+    st.caption("Maximize yield resilience and soil health using expert-backed intercropping guides tailored to Indian agro-climatic zones.")
+    
+    companion = getCompanionAdvisory(crop)
+    
+    with st.container(border=True):
+        st.markdown(f"### Recommended Companion Crop: **{companion['companion']}**")
+        st.markdown(f"**Key Agronomic Benefits:** {companion['benefits']}")
+        st.markdown(f"**Ideal Field Conditions:** {companion['conditions']}")
+
+    st.markdown("---")
+    st.subheader("💬 Ask the Hybrid AI Sustainability Advisor")
+    st.caption("Have questions about irrigation schedules, pest prevention, or soil health? Ask our agronomic AI assistant.")
+    
+    userQuery = st.text_input(
+        "Type your question here:", 
+        placeholder="e.g., How often should I water my crop given current soil moisture?"
+    )
+    
+    if userQuery:
+        response = queryGenerativeClimateAdvisor(
+            farmerDetails["name"], 
+            crop, 
+            acres, 
+            risk, 
+            advisory, 
+            companion, 
+            userQuery
+        )
+        st.info(response)
+
+# -------------------------------------------------------------------
+# TAB 3: REGISTER NEW FIELD / POLICY
+# -------------------------------------------------------------------
+with portalTab3:
+    st.subheader("📝 Register an Additional Field or Policy")
+    st.caption("Add a new farm holding to your account to extend parametric coverage across multiple plots.")
+    
+    with st.container(border=True):
+        with st.form("farmerPortalRegistration", clear_on_submit=True):
+            fCol1, fCol2 = st.columns(2)
+            
+            with fCol1:
+                portalName = st.text_input("Owner Full Name", value=farmerDetails["name"])
+                portalPhone = st.text_input("Mobile / WhatsApp Number", value=farmerDetails["phone"])
+                portalCrop = st.selectbox("Select Crop", CROP_LIST)
+                
+            with fCol2:
+                portalAcres = st.number_input("Farm Area (Acres)", min_value=0.5, max_value=50.0, value=2.0, step=0.5)
+                portalLat = st.number_input("Field Latitude", value=float(farmerDetails["lat"]), format="%.4f")
+                portalLon = st.number_input("Field Longitude", value=float(farmerDetails["lon"]), format="%.4f")
+                
+            portalSubmit = st.form_submit_button("Submit New Plot for Coverage")
+            
+            if portalSubmit:
+                if portalName and portalPhone:
+                    newId = f"FARM{101 + len(state['farmerDatabase'])}"
+                    polVal = int(portalAcres * 10000)
+                    
+                    newRecord = {
+                        "farmerId": newId,
+                        "name": portalName,
+                        "phone": portalPhone,
+                        "lat": float(portalLat),
+                        "lon": float(portalLon),
+                        "crop": portalCrop,
+                        "acres": float(portalAcres),
+                        "policyValue": polVal
+                    }
+                    
+                    state["farmerDatabase"].append(newRecord)
+                    st.success(f"🎉 Success! New plot registered with Policy ID `{newId}`. Coverage Value: `₹{polVal:,}`.")
+                    st.rerun()
+                else:
+                    st.error("Please ensure name and mobile number are provided.")
