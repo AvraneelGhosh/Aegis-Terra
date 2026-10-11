@@ -37,6 +37,11 @@ with mainTab:
     if st.sidebar.button("🔄 Sync Live Database", use_container_width=True):
         st.rerun()
 
+    if st.sidebar.button("🔓 Reset Circuit Breaker", use_container_width=True):
+        state["security"].reset()
+        st.toast("Circuit Breaker reset successfully!")
+        st.rerun()
+
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚙️ Company Settings")
     newPoolValue = st.sidebar.number_input(
@@ -106,7 +111,6 @@ with mainTab:
     with c1:
         st.subheader(f"Micro-Climate Telemetry ({farmerDetails['name']} - {crop})")
         
-        # Fixed Plotly Chart with Proper Margins & Non-Overlapping Legend
         fig = px.line(df, x='date', y=['tempMax', 'soilMoisturePercent', 'rainfall'], 
                       title=f"30-Day Environmental Metrics Trend")
         fig.update_layout(
