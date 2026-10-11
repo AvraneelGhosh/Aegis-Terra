@@ -42,7 +42,7 @@ def getSharedState():
             ],
             "farmerDatabase": [
                 {"farmerId": "FARM101", "name": "Rajesh Patel", "phone": "+919876543212", "lat": 12.9200, "lon": 79.1300, "crop": "Rice / Paddy", "acres": 2.5, "policyValue": 25000},
-                {"farmerId": "FARM102", "name": "Ananya Reddy", "phone": "+919876543210", "lat": 13.0827, "lon": 80.2707, "crop": "Wheat", "acres": 4.0, "policyValue": 40000},
+                {"farmerId": "FARM102", "name": "Ananya Reddy", "phone": "+919811223344", "lat": 13.0827, "lon": 80.2707, "crop": "Wheat", "acres": 4.0, "policyValue": 40000},
                 {"farmerId": "FARM103", "name": "Vikram Singh", "phone": "+919811223344", "lat": 11.0168, "lon": 76.9558, "crop": "Maize", "acres": 3.0, "policyValue": 30000},
                 {"farmerId": "FARM104", "name": "Meena Devi", "phone": "+919722334455", "lat": 10.7905, "lon": 78.7047, "crop": "Cotton", "acres": 1.5, "policyValue": 15000}
             ]
