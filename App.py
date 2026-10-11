@@ -24,6 +24,14 @@ st.session_state.security = state["security"]
 st.session_state.mlModel = state["mlModel"]
 st.session_state.mlAccuracy = state.get("mlAccuracy", 0.85)
 
+# 15 Most Sown Crops in India
+CROP_LIST = [
+    "Rice / Paddy", "Wheat", "Maize (Corn)", "Bajra (Pearl Millet)", 
+    "Jowar (Sorghum)", "Ragi (Finger Millet)", "Pulses (Gram / Tur / Lentils)", 
+    "Soybean", "Groundnut (Peanut)", "Mustard (Rapeseed)", "Sugarcane", 
+    "Cotton", "Jute", "Tea", "Coffee"
+]
+
 # Navigation Tabs
 mainTab, mapTab, auditTab, registerTab = st.tabs([
     "📊 Insurer Analytics Command Center", 
@@ -73,7 +81,6 @@ with mainTab:
     crop = farmerDetails["crop"]
     policyValue = int(farmerDetails["policyValue"])
     
-    # Fetch Weather Data & Display Source Transparency
     weatherDf = fetchWeatherData(lat, lon)
     df = generateTelemetryData(weatherDf)
     dataSourceStatus = df["sourceStatus"].iloc[0]
@@ -338,7 +345,7 @@ with registerTab:
             with regCol1:
                 newFarmerName = st.text_input("Full Name", placeholder="e.g. Rajesh Patel")
                 newFarmerPhone = st.text_input("Mobile / WhatsApp Number", placeholder="e.g. +919876543212")
-                newCrop = st.selectbox("Select Crop", ["Rice / Paddy", "Wheat", "Maize", "Cotton", "Sugarcane"])
+                newCrop = st.selectbox("Select Crop", CROP_LIST)
                 
             with regCol2:
                 newAcres = st.number_input("Farm Size (Acres)", min_value=0.5, max_value=50.0, value=2.0, step=0.5)
