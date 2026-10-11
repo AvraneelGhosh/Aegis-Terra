@@ -61,7 +61,7 @@ with mainTab:
     crop = farmerDetails["crop"]
     policyValue = int(farmerDetails["policyValue"])
     
-    # 1. Fetch Weather Data & Display Source Transparency
+    # Fetch Weather Data & Display Source Transparency
     weatherDf = fetchWeatherData(lat, lon)
     df = generateTelemetryData(weatherDf)
     dataSourceStatus = df["sourceStatus"].iloc[0]
@@ -106,15 +106,23 @@ with mainTab:
     with c1:
         st.subheader(f"Micro-Climate Telemetry ({farmerDetails['name']} - {crop})")
         
+        # Fixed Plotly Chart with Proper Margins & Non-Overlapping Legend
         fig = px.line(df, x='date', y=['tempMax', 'soilMoisturePercent', 'rainfall'], 
-                      title=f"30-Day Environmental Metrics Trend [{dataSourceStatus}]")
+                      title=f"30-Day Environmental Metrics Trend")
         fig.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             font=dict(color='#FFF5E6'),
             colorway=['#A36B4E', '#81B29A', '#D97757'],
-            margin=dict(l=20, r=20, t=40, b=20),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            margin=dict(l=20, r=20, t=60, b=20),
+            legend=dict(
+                orientation="h", 
+                yanchor="bottom", 
+                y=1.12, 
+                xanchor="right", 
+                x=1,
+                bgcolor='rgba(0,0,0,0)'
+            ),
             xaxis=dict(showgrid=False, zeroline=False),
             yaxis=dict(showgrid=True, gridcolor='#334037')
         )
@@ -254,7 +262,6 @@ with auditTab:
                 with auditCol3:
                     st.write("**Auditor Action:**")
                     
-                    # FIX 1: ROUTE ALL PAYOUTS THROUGH FailSafes.py
                     if st.button("✅ Approve Payout", key=f"approve_{idx}"):
                         success, failMsg = state["security"].processPayout(pClaim['amount'])
                         
