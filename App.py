@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 from datetime import datetime
+import inspect
 
 from DataPipeline import fetchWeatherData, generateTelemetryData
 from RiskEngine import calculateRiskIndex, generateAiPrecautions, predictLocationRisk
@@ -283,7 +284,13 @@ with auditTab:
                     
                     if st.button("✅ Approve Payout", key=f"approve_{idx}"):
                         claimIdToProcess = pClaim['claimId']
-                        success, failMsg = state["security"].processPayout(claimIdToProcess, pClaim['amount'])
+                        
+                        # Safe check for argument signature (supports cached SecurityEngine versions)
+                        sig = inspect.signature(state["security"].processPayout)
+                        if len(sig.parameters) >= 2:
+                            success, failMsg = state["security"].processPayout(claimIdToProcess, pClaim['amount'])
+                        else:
+                            success, failMsg = state["security"].processPayout(pClaim['amount'])
                         
                         if success:
                             state["totalPayoutsExecuted"] += pClaim['amount']
