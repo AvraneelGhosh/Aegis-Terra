@@ -1,46 +1,51 @@
+import pandas as pd
+import numpy as np
+
 class SecurityEngine:
-    def __init__(self, dailyPayoutLimit=5000):
-        self.dailyPayoutLimit = dailyPayoutLimit
-        self.currentDailyPayouts = 0
+    def __init__(self):
         self.circuitBreakerTripped = False
+        self.dailyPayoutCap = 400000.0  # ₹4,00,000 daily limit
+        self.currentDailyPayouts = 0.0
 
-    def validateClaim(self, weatherData, riskMetrics):
+    def validateClaim(self, df, riskData):
         """
-        Cross-validates multi-source metrics and assigns a Confidence Score (0-100%).
-        Failsafe Rule: Catches sensor glitches or conflicting satellite data.
+        Validates environmental data anomalies and returns confidence score (0-100%).
         """
-        confidence = 100
         flags = []
+        confidence = 100
+        
+        # Check temperature anomaly
+        if riskData['avgTemp'] > 45:
+            flags.append("Extreme temperature outlier detected")
+            confidence -= 15
+            
+        # Check rainfall data consistency
+        if riskData['totalRain30d'] < 0:
+            flags.append("Negative rainfall anomaly detected")
+            confidence -= 30
+            
+        # Check soil moisture consistency
+        if riskData['avgSoil'] < 5 and riskData['totalRain30d'] > 100:
+            flags.append("Divergence between soil moisture and rainfall")
+            confidence -= 20
 
-        # Check 1: Outlier Temperature detection (Sensor glitch detection)
-        latestTemp = weatherData['tempMax'].iloc[-1]
-        if latestTemp > 50 or latestTemp < 0:
-            confidence -= 60
-            flags.append("Corrupted Temperature Sensor Payload Detected")
-
-        # Check 2: Multi-source validation (Rainfall vs NDVI conflict)
-        if riskMetrics['totalRain30d'] < 5 and riskMetrics['avgNdvi'] > 0.75:
-            confidence -= 40
-            flags.append("Conflict: Severe rainfall deficit but satellite shows dense green vegetation")
-
-        # Determine Route based on Confidence Score
-        if confidence >= 90:
-            status = "AUTO APPROVED"
-        elif confidence >= 70:
-            status = "PENDING AUDIT"
-        else:
-            status = "REJECTED FLAGGED"
-
-        return confidence, status, flags
+        claimStatus = "VALIDATED" if confidence >= 90 else ("FLAGGED FOR AUDIT" if confidence >= 70 else "REJECTED")
+        return confidence, claimStatus, flags
 
     def processPayout(self, amount):
-        """Executes payout through Circuit Breaker protection."""
+        """
+        Validates daily limits and circuit breaker before executing payout.
+        """
         if self.circuitBreakerTripped:
-            return False, "CIRCUIT BREAKER ACTIVE: System frozen due to anomaly threshold."
+            return False, "CIRCUIT BREAKER TRIPPED: All automated payouts are currently frozen by system administrator."
 
-        if (self.currentDailyPayouts + amount) > self.dailyPayoutLimit:
+        if amount <= 0:
+            return False, "INVALID AMOUNT: Payout amount must be greater than ₹0."
+
+        if (self.currentDailyPayouts + amount) > self.dailyPayoutCap:
             self.circuitBreakerTripped = True
-            return False, "CIRCUIT BREAKER TRIPPED: Payout request exceeds daily liquidity safety cap ($5,000)."
+            return False, f"CIRCUIT BREAKER TRIPPED: Payout request exceeds daily liquidity safety cap (₹{self.dailyPayoutCap:,.0f})."
 
+        # Execute Payout
         self.currentDailyPayouts += amount
-        return True, f"Payout of ${amount} approved. Remaining daily pool: ${self.dailyPayoutLimit - self.currentDailyPayouts}"
+        return True, "Payout successfully processed."
