@@ -1,119 +1,139 @@
 import numpy as np
-import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from google import genai
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
-def trainPredictiveRiskModel():
-    X_train = np.array([
-        [10, 32, 20], [0, 41, 10], [5, 35, 15], [80, 28, 70], [120, 26, 85], [2, 39, 12]
-    ])
-    y_train = np.array([0, 1, 0, 0, 0, 1])
-    model = RandomForestClassifier(n_estimators=10, random_state=42)
+def trainRiskModel():
+    """
+    Trains a prototype Random Forest model with realistic feature ranges.
+    Features: [30-Day Total Rain (mm), Avg Temp (°C), Avg Soil Moisture (%), Avg NDVI]
+    """
+    np.random.seed(42)
+    nSamples = 1000
+    
+    # 1. Feature generation matching actual runtime distributions
+    rain = np.random.uniform(0, 300, nSamples)      # 0 to 300 mm 30-day rain
+    temp = np.random.uniform(20, 45, nSamples)      # 20 to 45 °C
+    soil = np.random.uniform(10, 80, nSamples)      # 10 to 80 % moisture
+    ndvi = np.random.uniform(0.1, 0.8, nSamples)    # 0.1 to 0.8 vegetation index
+    
+    X = np.column_stack([rain, temp, soil, ndvi])
+    
+    # 2. Synthetic Ground Truth Labeling based on agronomic stress
+    # High risk = Low Rain (<50mm) AND High Temp (>35C) OR Very Low NDVI (<0.25)
+    y = np.where((rain < 60) & (temp > 34) | (ndvi < 0.25), 1, 0)
+    
+    # 3. Held-out train-test split for evaluation
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    model = RandomForestClassifier(n_estimators=50, random_state=42)
     model.fit(X_train, y_train)
-    return model
-
-def calculateRiskIndex(df):
-    totalRain30d = float(df['rainfall'].sum())
-    avgTemp = float(df['tempMax'].mean())
-    avgSoil = float(df['soilMoisturePercent'].mean()) if 'soilMoisturePercent' in df else 45.0
-    avgNdvi = float(df['ndvi'].mean()) if 'ndvi' in df else 0.5
     
-    tempFactor = max(0.0, (avgTemp - 32) / 15)
-    rainFactor = max(0.0, (50 - totalRain30d) / 50)
-    compositeRisk = round(min(1.0, (tempFactor * 0.6) + (rainFactor * 0.4)), 2)
+    acc = accuracy_score(y_test, model.predict(X_test))
     
-    return {
-        "totalRain30d": round(totalRain30d, 1),
-        "avgTemp": round(avgTemp, 1),
-        "avgSoil": round(avgSoil, 1),
-        "avgNdvi": round(avgNdvi, 1),
-        "compositeRisk": compositeRisk
-    }
+    return model, acc
 
-def predictLocationRisk(model, risk):
-    features = np.array([[risk['totalRain30d'], risk['avgTemp'], risk['avgSoil']]])
-    prob = model.predict_proba(features)[0][1]
+def predictLocationRisk(model, riskData):
+    """
+    Predicts drought risk probability using the trained Random Forest model.
+    """
+    features = np.array([[
+        riskData['totalRain30d'],
+        riskData['avgTemp'],
+        riskData['avgSoil'],
+        riskData['avgNdvi']
+    ]])
+    
+    prob = model.predict_proba(features)[0][1] # Probability of High Risk Class
     return float(prob)
 
-def generateAiPrecautions(risk):
-    if risk['compositeRisk'] >= 0.7:
+def calculateRiskIndex(df):
+    """
+    Calculates aggregated environmental metrics and composite risk score.
+    """
+    totalRain30d = round(float(df['rainfall'].sum()), 1)
+    avgTemp = round(float(df['tempMax'].mean()), 1)
+    avgSoil = round(float(df['soilMoisturePercent'].mean()), 1)
+    avgNdvi = round(float(df['ndvi'].mean()), 2)
+    
+    # Composite Score (0.0 to 1.0)
+    # Higher rain/soil reduces risk; higher temp increases risk
+    rainFactor = max(0, (100 - totalRain30d) / 100)
+    tempFactor = max(0, (avgTemp - 25) / 20)
+    soilFactor = max(0, (50 - avgSoil) / 50)
+    
+    compositeRisk = min(1.0, max(0.0, (rainFactor * 0.4) + (tempFactor * 0.3) + (soilFactor * 0.3)))
+    
+    return {
+        "totalRain30d": totalRain30d,
+        "avgTemp": avgTemp,
+        "avgSoil": avgSoil,
+        "avgNdvi": avgNdvi,
+        "compositeRisk": round(compositeRisk, 2)
+    }
+
+def generateAiPrecautions(riskData):
+    """
+    Generates actionable advisory based on composite risk score.
+    """
+    score = riskData['compositeRisk']
+    if score >= 0.7:
         return {
-            "level": "🔴 High Drought & Heat Stress",
-            "action": "Severe heat and dry spell forecast. Postpone non-critical flooding; utilize drip micro-irrigation; apply organic mulch to conserve root-zone moisture."
+            "level": "🔴 CRITICAL DROUGHT RISK",
+            "action": "Immediate irrigation advised. Initiate parametric claim review."
         }
-    elif risk['compositeRisk'] >= 0.4:
+    elif score >= 0.4:
         return {
-            "level": "🟡 Moderate Climate Risk",
-            "action": "Unstable rainfall patterns detected. Monitor soil moisture daily and ensure field drainage channels are cleared for sudden downpours."
+            "level": "🟡 MODERATE CLIMATE STRESS",
+            "action": "Monitor soil moisture closely. Apply soil mulch to retain moisture."
         }
     else:
         return {
-            "level": "🟢 Favorable Conditions",
-            "action": "Climate indicators are stable. Maintain standard seasonal crop management and optimal nutrient scheduling."
+            "level": "🟢 LOW RISK",
+            "action": "Optimal growing conditions. Maintain standard field routine."
         }
 
 def getCompanionAdvisory(crop):
-    knowledgeBase = {
+    """
+    Returns agronomic companion planting advice based on crop type.
+    """
+    advisories = {
         "Rice / Paddy": {
-            "companion": "Sesbania / Legume Green Manure",
-            "benefits": "Enhances soil nitrogen fixation, organic matter, and suppresses weed germination.",
-            "conditions": "Requires controlled shallow water management during early vegetative growth."
+            "companion": "Azolla & Duckweed",
+            "benefits": "Fixes atmospheric nitrogen, reduces weed growth, conserves water.",
+            "conditions": "Flooded paddy fields with continuous moisture."
         },
         "Wheat": {
-            "companion": "Chickpea or Mustard",
-            "benefits": "Improves land equivalent ratio and optimizes soil profile moisture usage.",
-            "conditions": "Best suited for well-drained loamy soils with moderate winter precipitation."
+            "companion": "Chickpea / Mustard",
+            "benefits": "Improves soil nitrogen efficiency and prevents pest proliferation.",
+            "conditions": "Cool dry climate during early vegetative growth."
         },
         "Maize": {
-            "companion": "Cowpea or Climbing Beans",
-            "benefits": "Nitrogen fixation through root nodules, natural weed suppression, and yield diversification.",
-            "conditions": "Ensure adequate plant spacing to minimize light and water competition."
+            "companion": "Cowpea / Beans",
+            "benefits": "Provides ground cover, prevents soil erosion, fixes nitrogen.",
+            "conditions": "Well-drained soil with medium moisture."
         },
         "Cotton": {
-            "companion": "Black Gram or Marigold",
-            "benefits": "Attracts beneficial predatory insects, lowers bollworm incidence, and fixes nitrogen.",
-            "conditions": "Monitor soil moisture closely to prevent waterlogging during heavy monsoon spells."
+            "companion": "Marigold / Pigeon Pea",
+            "benefits": "Acts as a trap crop for bollworms and enhances soil structure.",
+            "conditions": "Warm climate with deep fertile soil."
         },
         "Sugarcane": {
-            "companion": "Coriander or Onion",
-            "benefits": "Maximizes early-stage ground cover, reduces weed pressure, and provides auxiliary income.",
-            "conditions": "Requires wide-row planting arrangements for companion root expansion."
+            "companion": "Soybean / Groundnut",
+            "benefits": "Supplies organic matter and generates additional intercrop income.",
+            "conditions": "High moisture and full sun exposure."
         }
     }
-    return knowledgeBase.get(crop, {
-        "companion": "Cover Crop Legumes",
-        "benefits": "Improves soil structural stability and organic carbon content.",
-        "conditions": "Verify local soil testing parameters prior to implementation."
-    })
+    return advisories.get(crop, advisories["Rice / Paddy"])
 
 def queryGenerativeClimateAdvisor(farmerName, crop, acres, riskData, advisoryData, companionData, userQuery):
-    try:
-        client = genai.Client()
-        prompt = f"""
-        You are Aegis Terra's Expert AI Agricultural & Climate Sustainability Advisor. 
-        You are speaking directly with a smallholder farmer named {farmerName}.
-        
-        Farmer Profile:
-        - Crop: {crop} ({acres} Acres)
-        - 30-Day Rainfall: {riskData['totalRain30d']} mm
-        - Average Temperature: {riskData['avgTemp']} °C
-        - Soil Moisture Level: {riskData['avgSoil']}%
-        - Composite Climate Risk Score: {riskData['compositeRisk']} / 1.0 ({advisoryData['level']})
-        - Core Advisory Action: {advisoryData['action']}
-        - Recommended Sustainable Companion Crop: {companionData['companion']} ({companionData['benefits']})
-        
-        Farmer Query / Interaction: "{userQuery}"
-        
-        Instructions:
-        1. Maintain an encouraging, respectful, and expert tone suited for smallholder farmers in India.
-        2. Ground your response strictly in the telemetry and structured agronomic data provided above.
-        3. Explain why certain actions are recommended based on their soil and weather metrics.
-        4. Keep the response concise, actionable, and formatted cleanly with bullet points or emojis.
-        """
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt
-        )
-        return response.text
-    except Exception as e:
-        return f"🤖 **Aegis Terra AI Advisor:** Based on your current weather telemetry (Risk Score: {riskData['compositeRisk']}), {advisoryData['action']} For {crop}, consider {companionData['companion']} to improve soil health."
+    """
+    Simulates a hybrid AI agronomic assistant response.
+    """
+    query = userQuery.lower()
+    if "water" in query or "irrigation" in query:
+        return f"Hello {farmerName}, based on your current 30-day rainfall of {riskData['totalRain30d']}mm and soil moisture at {riskData['avgSoil']}%, we recommend maintaining drip irrigation during morning hours."
+    elif "companion" in query or "crop" in query:
+        return f"For your {crop} farm ({acres} acres), intercropping with **{companionData['companion']}** is highly recommended: {companionData['benefits']}"
+    else:
+        return f"Aegis Assistant: Based on your risk level ({advisoryData['level']}), current recommendation is: {advisoryData['action']}"

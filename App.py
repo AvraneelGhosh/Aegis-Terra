@@ -18,6 +18,7 @@ st.caption("Aligned with UN SDGs: 1 (No Poverty), 2 (Zero Hunger), 13 (Climate A
 state = getSharedState()
 st.session_state.security = state["security"]
 st.session_state.mlModel = state["mlModel"]
+st.session_state.mlAccuracy = state.get("mlAccuracy", 0.85)
 
 # Navigation Tabs
 mainTab, mapTab, auditTab, registerTab = st.tabs([
@@ -60,18 +61,22 @@ with mainTab:
     crop = farmerDetails["crop"]
     policyValue = int(farmerDetails["policyValue"])
     
+    # 1. Fetch Weather Data & Display Source Transparency
+    weatherDf = fetchWeatherData(lat, lon)
+    df = generateTelemetryData(weatherDf)
+    dataSourceStatus = df["sourceStatus"].iloc[0]
+    
     with st.sidebar.container(border=True):
         st.markdown(f"**Policy ID:** `{farmerDetails['farmerId']}`")
         st.markdown(f"**Phone:** `{farmerDetails['phone']}`")
         st.markdown(f"**Farm Area:** `{farmerDetails['acres']} Acres`")
+        st.markdown(f"**Data Lineage:** {dataSourceStatus}")
         
         with st.popover("ℹ️ Policy Rules & Thresholds"):
             st.markdown("**Deductible:** `0%`")
             st.markdown("**Parametric Trigger:** 30-Day Rain < 20mm or Temp > 38°C")
             st.markdown("**Max Single Settlement:** `₹1,00,000`")
 
-    weatherDf = fetchWeatherData(lat, lon)
-    df = generateTelemetryData(weatherDf)
     risk = calculateRiskIndex(df)
     advisory = generateAiPrecautions(risk)
     mlRiskScore = predictLocationRisk(state["mlModel"], risk)
@@ -89,11 +94,11 @@ with mainTab:
     st.markdown("---")
 
     col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("30-Day Rainfall", f"{risk['totalRain30d']} mm", delta="-12mm vs Avg", delta_color="inverse")
-    col2.metric("Average Max Temp", f"{risk['avgTemp']} °C", delta="+3°C vs Avg", delta_color="inverse")
-    col3.metric("Satellite NDVI Index", f"{risk['avgNdvi']}", delta="-0.15 Stress", delta_color="inverse")
+    col1.metric("30-Day Rainfall", f"{risk['totalRain30d']} mm", delta=dataSourceStatus)
+    col2.metric("Average Max Temp", f"{risk['avgTemp']} °C", delta=dataSourceStatus)
+    col3.metric("Satellite NDVI Index", f"{risk['avgNdvi']}", delta="Derived/Simulated")
     col4.metric("Composite Risk Score", f"{risk['compositeRisk']} / 1.0", delta=advisory['level'])
-    col5.metric("ML Risk Prediction", f"{int(mlRiskScore * 100)}% Risk", delta="Random Forest")
+    col5.metric("ML Risk Prediction", f"{int(mlRiskScore * 100)}%", delta=f"RF Prototype ({int(state['mlAccuracy']*100)}% Acc)")
 
     st.markdown("---")
 
@@ -101,9 +106,8 @@ with mainTab:
     with c1:
         st.subheader(f"Micro-Climate Telemetry ({farmerDetails['name']} - {crop})")
         
-        # Styled Plotly Chart Matching Botanical Theme
         fig = px.line(df, x='date', y=['tempMax', 'soilMoisturePercent', 'rainfall'], 
-                      title="30-Day Environmental Metrics Trend")
+                      title=f"30-Day Environmental Metrics Trend [{dataSourceStatus}]")
         fig.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
@@ -150,7 +154,7 @@ with mapTab:
             "Select Heatmap Layer:",
             ["Temperature (°C)", "Rainfall (mm)", "Soil Moisture (%)", "Satellite NDVI Index"]
         )
-        st.info("💡 **Map Controls:**\n\nToggle layers to inspect drought hotspots. Hover over pins for live farm telemetry.")
+        st.info("💡 **Map Controls:**\n\nToggle layers to inspect drought hotspots. Derived satellite/soil metrics are clearly marked.")
 
     mapDataList = []
     for row in state["farmerDatabase"]:
@@ -169,7 +173,8 @@ with mapTab:
             "Rainfall (mm)": fRisk["totalRain30d"],
             "Soil Moisture (%)": fRisk["avgSoil"],
             "Satellite NDVI Index": fRisk["avgNdvi"],
-            "Risk Score": fRisk["compositeRisk"]
+            "Risk Score": fRisk["compositeRisk"],
+            "Data Source": fTelemetry["sourceStatus"].iloc[0]
         })
         
     mapDf = pd.DataFrame(mapDataList)
@@ -204,7 +209,7 @@ with mapTab:
             color="Risk Score", 
             size="Acres",
             hover_name="Farmer", 
-            hover_data=["Policy ID", "Crop", "Temperature (°C)", "Rainfall (mm)", "Soil Moisture (%)", "Satellite NDVI Index"],
+            hover_data=["Policy ID", "Crop", "Temperature (°C)", "Rainfall (mm)", "Data Source"],
             color_continuous_scale="Viridis", 
             zoom=7
         )
@@ -233,7 +238,7 @@ with auditTab:
     if len(state["pendingClaims"]) == 0:
         st.success("🎉 No pending claims requiring auditor manual verification.")
     else:
-        for idx, pClaim in enumerate(state["pendingClaims"]):
+        for idx, pClaim in enumerate(list(state["pendingClaims"])):
             with st.expander(f"📌 Claim `{pClaim['claimId']}` - {pClaim['farmerName']} (₹{pClaim['amount']:,})", expanded=True):
                 auditCol1, auditCol2, auditCol3 = st.columns([2, 2, 1])
                 
@@ -248,23 +253,29 @@ with auditTab:
                     
                 with auditCol3:
                     st.write("**Auditor Action:**")
+                    
+                    # FIX 1: ROUTE ALL PAYOUTS THROUGH FailSafes.py
                     if st.button("✅ Approve Payout", key=f"approve_{idx}"):
-                        state["totalPayoutsExecuted"] += pClaim['amount']
-                        state["security"].currentDailyPayouts += pClaim['amount']
+                        success, failMsg = state["security"].processPayout(pClaim['amount'])
                         
-                        newRecord = {
-                            "claimId": pClaim['claimId'],
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "farmerName": pClaim['farmerName'],
-                            "policyId": pClaim['policyId'],
-                            "amount": pClaim['amount'],
-                            "status": "MANUAL APPROVED",
-                            "confidence": pClaim['confidence'],
-                            "notes": "Approved by Human Auditor"
-                        }
-                        state["claimLedger"].append(newRecord)
-                        state["pendingClaims"].pop(idx)
-                        st.rerun()
+                        if success:
+                            state["totalPayoutsExecuted"] += pClaim['amount']
+                            newRecord = {
+                                "claimId": pClaim['claimId'],
+                                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                "farmerName": pClaim['farmerName'],
+                                "policyId": pClaim['policyId'],
+                                "amount": pClaim['amount'],
+                                "status": "MANUAL APPROVED",
+                                "confidence": pClaim['confidence'],
+                                "notes": f"Approved by Human Auditor: Validated via FailSafes Engine"
+                            }
+                            state["claimLedger"].append(newRecord)
+                            state["pendingClaims"].pop(idx)
+                            st.toast(f"✅ Claim {pClaim['claimId']} Approved Successfully!")
+                            st.rerun()
+                        else:
+                            st.error(f"🚨 Security Blocked Payout: {failMsg}")
                         
                     if st.button("❌ Reject Claim", key=f"reject_{idx}"):
                         newRecord = {
@@ -275,16 +286,16 @@ with auditTab:
                             "amount": pClaim['amount'],
                             "status": "REJECTED",
                             "confidence": pClaim['confidence'],
-                            "notes": "Rejected by Human Auditor"
+                            "notes": f"Rejected by Auditor. Reason: {pClaim['reason']}"
                         }
                         state["claimLedger"].append(newRecord)
                         state["pendingClaims"].pop(idx)
+                        st.toast(f"❌ Claim {pClaim['claimId']} Rejected.")
                         st.rerun()
 
     st.markdown("---")
     st.subheader("📜 Executed Payout & Audit History Ledger")
     
-    # Enhanced Dataframe with Column Config
     st.dataframe(
         pd.DataFrame(state["claimLedger"]), 
         column_config={
