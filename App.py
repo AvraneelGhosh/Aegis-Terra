@@ -7,6 +7,7 @@ from datetime import datetime
 from DataPipeline import fetchWeatherData, generateTelemetryData
 from RiskEngine import calculateRiskIndex, generateAiPrecautions, predictLocationRisk
 from GlobalState import getSharedState
+from FailSafes import SecurityEngine
 
 # Page Configuration
 st.set_page_config(page_title="Aegis Terra - Command Center", layout="wide", page_icon="🛡️")
@@ -16,6 +17,9 @@ st.caption("Aligned with UN SDGs: 1 (No Poverty), 2 (Zero Hunger), 13 (Climate A
 
 # Fetch Centralized State
 state = getSharedState()
+if "security" not in state or state["security"] is None:
+    state["security"] = SecurityEngine()
+
 st.session_state.security = state["security"]
 st.session_state.mlModel = state["mlModel"]
 st.session_state.mlAccuracy = state.get("mlAccuracy", 0.85)
@@ -38,7 +42,10 @@ with mainTab:
         st.rerun()
 
     if st.sidebar.button("🔓 Reset Circuit Breaker", use_container_width=True):
-        state["security"].reset()
+        if hasattr(state["security"], "reset"):
+            state["security"].reset()
+        else:
+            state["security"] = SecurityEngine()
         st.toast("Circuit Breaker reset successfully!")
         st.rerun()
 
