@@ -15,7 +15,7 @@ from GlobalState import getSharedState
 st.set_page_config(page_title="Aegis Terra - Farmer Portal", layout="wide", page_icon="🌾")
 
 st.title("🌾 Aegis Terra: Farmer Self-Service Portal")
-st.caption("Real-time parametric policy tracking, micro-climate telemetry, and instant claim execution.")
+st.caption("Real-time parametric policy tracking, micro-climate telemetry, and 5-day predictive forecasts.")
 
 # Fetch Centralized Shared State
 state = getSharedState()
@@ -127,6 +127,25 @@ with portalTab1:
         else:
             st.success("🟢 **Optimal Growing Conditions**")
             st.markdown("Your farm's 30-day weather and soil metrics are well within safe thresholds. No parametric triggers activated.")
+
+    st.markdown("---")
+    
+    # 5-Day Predictive Weather & Climate Outlook
+    st.subheader("🔮 Next 5-Day Environmental Forecast Outlook")
+    st.caption("Short-range predictive telemetry for proactive field management.")
+    
+    # Extract the last 5 days from telemetry dataframe as the near-term forecast outlook
+    forecastDf = df.tail(5).copy()
+    fCols = st.columns(5)
+    
+    for i, (_, row) in enumerate(forecastDf.iterrows()):
+        with fCols[i]:
+            dateStr = pd.to_datetime(row['date']).strftime('%b %d')
+            with st.container(border=True):
+                st.markdown(f"**{dateStr}**")
+                st.markdown(f"🌡️ Max: `{row['tempMax']}°C`")
+                st.markdown(f"💧 Rain: `{row['rainfall']}mm`")
+                st.markdown(f"🌱 Soil: `{row['soilMoisturePercent']}%`")
 
 # -------------------------------------------------------------------
 # TAB 2: COMPANION ADVISORY & AI ASSISTANT
