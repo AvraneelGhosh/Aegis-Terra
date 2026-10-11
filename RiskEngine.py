@@ -6,12 +6,14 @@ from sklearn.metrics import accuracy_score
 def trainRiskModel():
     """
     Trains a prototype Random Forest model with realistic feature ranges.
-    Features: [30-Day Total Rain (mm), Avg Temp (°C), Avg Soil Moisture (%), Avg NDVI]
+    Features: [30-Day Total Rain (mm) [0-500], Avg Temp (°C) [20-45], Avg Soil Moisture (%) [10-80], Avg NDVI [0.1-0.8]]
+    Note: Evaluated on synthetic baseline holdout data as a prototype decision-support model.
     """
     np.random.seed(42)
     nSamples = 1000
     
-    rain = np.random.uniform(0, 300, nSamples)
+    # Corrected feature range: 30-day rainfall spanning 0 to 500 mm
+    rain = np.random.uniform(0, 500, nSamples)
     temp = np.random.uniform(20, 45, nSamples)
     soil = np.random.uniform(10, 80, nSamples)
     ndvi = np.random.uniform(0.1, 0.8, nSamples)

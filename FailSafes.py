@@ -6,11 +6,13 @@ class SecurityEngine:
         self.circuitBreakerTripped = False
         self.dailyPayoutCap = 400000.0  # ₹4,00,000 daily limit
         self.currentDailyPayouts = 0.0
+        self.processedClaimIds = set()   # Prevents duplicate claim execution
 
     def reset(self):
-        """Resets the circuit breaker and clears daily payouts for live demos."""
+        """Resets the circuit breaker, daily payouts, and processed claims for live demos."""
         self.circuitBreakerTripped = False
         self.currentDailyPayouts = 0.0
+        self.processedClaimIds.clear()
 
     def validateClaim(self, df, riskData):
         """
@@ -34,9 +36,10 @@ class SecurityEngine:
         claimStatus = "VALIDATED" if confidence >= 90 else ("FLAGGED FOR AUDIT" if confidence >= 70 else "REJECTED")
         return confidence, claimStatus, flags
 
-    def processPayout(self, amount):
+    def processPayout(self, claimId, amount):
         """
-        Validates daily limits and circuit breaker before executing payout.
+        Validates daily limits, circuit breaker, positive amounts, and duplicate claims.
+        Routes every payout approval through this single security gateway.
         """
         if self.circuitBreakerTripped:
             return False, "CIRCUIT BREAKER ACTIVE: System frozen due to anomaly threshold."
@@ -44,9 +47,14 @@ class SecurityEngine:
         if amount <= 0:
             return False, "INVALID AMOUNT: Payout amount must be greater than ₹0."
 
+        if claimId in self.processedClaimIds:
+            return False, f"DUPLICATE ERROR: Claim ID {claimId} has already been processed."
+
         if (self.currentDailyPayouts + amount) > self.dailyPayoutCap:
             self.circuitBreakerTripped = True
-            return False, f"CIRCUIT BREAKER ACTIVE: Payout request exceeds daily liquidity safety cap (₹{self.dailyPayoutCap:,.0f})."
+            return False, f"CIRCUIT BREAKER TRIPPED: Payout request exceeds daily liquidity safety cap (₹{self.dailyPayoutCap:,.0f})."
 
+        # Execute Payout Safely
         self.currentDailyPayouts += amount
-        return True, "Payout successfully processed."
+        self.processedClaimIds.add(claimId)
+        return True, "Payout successfully processed and verified."

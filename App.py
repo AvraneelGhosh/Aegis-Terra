@@ -81,6 +81,7 @@ with mainTab:
     crop = farmerDetails["crop"]
     policyValue = int(farmerDetails["policyValue"])
     
+    # Fetch Weather Data & Display Source Transparency
     weatherDf = fetchWeatherData(lat, lon)
     df = generateTelemetryData(weatherDf)
     dataSourceStatus = df["sourceStatus"].iloc[0]
@@ -281,23 +282,24 @@ with auditTab:
                     st.write("**Auditor Action:**")
                     
                     if st.button("✅ Approve Payout", key=f"approve_{idx}"):
-                        success, failMsg = state["security"].processPayout(pClaim['amount'])
+                        claimIdToProcess = pClaim['claimId']
+                        success, failMsg = state["security"].processPayout(claimIdToProcess, pClaim['amount'])
                         
                         if success:
                             state["totalPayoutsExecuted"] += pClaim['amount']
                             newRecord = {
-                                "claimId": pClaim['claimId'],
+                                "claimId": claimIdToProcess,
                                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                                 "farmerName": pClaim['farmerName'],
                                 "policyId": pClaim['policyId'],
                                 "amount": pClaim['amount'],
                                 "status": "MANUAL APPROVED",
                                 "confidence": pClaim['confidence'],
-                                "notes": f"Approved by Human Auditor: Validated via FailSafes Engine"
+                                "notes": f"Approved by Auditor & Verified via Security Gateway"
                             }
                             state["claimLedger"].append(newRecord)
                             state["pendingClaims"].pop(idx)
-                            st.toast(f"✅ Claim {pClaim['claimId']} Approved Successfully!")
+                            st.toast(f"✅ Claim {claimIdToProcess} Approved Successfully!")
                             st.rerun()
                         else:
                             st.error(f"🚨 Security Blocked Payout: {failMsg}")
